@@ -7,6 +7,8 @@
 
 #include "SketchInfo.h"
 
+void preprocess_cluster(int cut_opt, int width, int height, Capture* inout_capture);
+
 void RDP(std::vector<glm::dvec2> const &points, std::vector<size_t> &indices, double epsilon);
 void RDP(Sketch &s, double epsilon);
 

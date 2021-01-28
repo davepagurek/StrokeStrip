@@ -15,14 +15,110 @@
 
 double short_seg_len = 15;//2;
 double short_ratio = 0.15;
-double max_curv_threshold = 1./8;
+double max_curv_threshold = 1./2;
 
 double curvature_cut_min_length = 5.;
 double max_curvature_ratio = 3;
 
-extern size_t min_num_sample_per_stroke;
-extern size_t max_num_sample_per_stroke;
-extern double input_median_length;
+double min_reparam_step_length = 5.;
+size_t min_num_sample_per_stroke = 30;
+size_t max_num_sample_per_stroke = 100;
+double input_median_length;
+
+double epsilon_small;
+
+void preprocess_cluster(int cut_opt, int width, int height, Capture* inout_capture) {
+	Capture& capture = *inout_capture;
+
+	epsilon_small = capture.thickness;
+
+	StrokeCut cut;
+	std::map<size_t, size_t> cutindex_to_index;
+	std::map<size_t, std::vector<size_t>> c_record;
+	std::map<size_t, size_t> reindex_to_index;
+	std::map<size_t, size_t> index_to_reindex;
+
+	// cut
+	//if (!precomputed) {
+	//capture = cut.cut_hooks_simple(capture);
+	//capture = cut.cut_RDP_sharp_turns(capture);
+
+	cut.prepare_cornucopia(capture);
+	capture = cut.cut_cornucopia(capture, cutindex_to_index, c_record, cut_opt != 0);
+	//capture = cut.cut_hooks_simple(capture);
+
+	std::map<size_t, std::vector<size_t>> c_record2;
+	std::map<size_t, size_t> cutindex_to_index2;
+	//capture = cut.cut_spirals(capture, cutindex_to_index2, c_record2);
+
+	for (auto const ind : cutindex_to_index2) {
+		if (cutindex_to_index.count(ind.first) == 0)
+			cutindex_to_index[ind.first] = ind.second;
+	}
+
+	// c_record2 => c_record
+	{
+		for (auto &record : c_record) {
+			std::vector<size_t> new_cuts;
+			for (auto &cut : record.second) {
+				if (c_record2.count(cut) > 0) {
+					for (auto &c2 : c_record2[cut]) {
+						new_cuts.emplace_back(c2);
+					}
+				}
+				else
+					new_cuts.emplace_back(cut);
+			}
+			record.second = new_cuts;
+		}
+	}
+
+	// reparameterize
+	for (size_t i = 0; i < capture.sketchedPolylines.size(); i++) {
+		//capture.getSketchedPolyline(i).reparameterize(min_reparam_step_length);
+		double step_length = capture.getSketchedPolyline(i).totalLen() / min_num_sample_per_stroke;
+		step_length = std::min(step_length, min_reparam_step_length);
+		capture.getSketchedPolyline(i).reparameterize(step_length);
+	}
+	//}
+
+	// filter size
+	// Debug
+	//if (!precomputed) {
+	Capture filtered_capture;
+	//double long_len = 15;
+	double long_len = std::min(5., 0.015 * std::sqrt(width * width + height * height));
+	for (size_t i = 0; i < capture.sketchedPolylines.size(); i++) {
+		if (capture.getSketchedPolyline(i).totalLen() >= long_len) {
+			filtered_capture.sketchedPolylines.emplace_back(capture.getSketchedPolyline(i));
+		}
+	}
+
+	capture = filtered_capture;
+	//}
+
+	// compute median length
+	std::vector<double> lengths;
+	lengths.reserve(capture.sketchedPolylines.size());
+
+	for (size_t i = 0; i < capture.sketchedPolylines.size(); i++) {
+		lengths.emplace_back(capture.getSketchedPolyline(i).totalLen());
+	}
+
+	std::nth_element(lengths.begin(), lengths.begin() + lengths.size() / 2, lengths.end());
+	input_median_length = lengths[lengths.size() / 2];
+
+	// Reorder stroke indices
+	{
+		size_t re_ind = 0;
+		for (size_t i = 0; i < capture.sketchedPolylines.size(); i++) {
+			reindex_to_index.emplace(re_ind, capture.getSketchedPolyline(i).stroke_ind);
+			index_to_reindex.emplace(capture.getSketchedPolyline(i).stroke_ind, re_ind);
+			cut.update_cut_record(-1 * (int)capture.getSketchedPolyline(i).stroke_ind, re_ind);
+			capture.getSketchedPolyline(i).stroke_ind = re_ind++;
+		}
+	}
+}
 
 glm::dvec2 to_glm_vec(const SketchUI::Point2D& pt) {
 	return glm::dvec2(pt.x, pt.y);
