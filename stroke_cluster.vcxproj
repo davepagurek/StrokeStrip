@@ -148,8 +148,10 @@
     <ClCompile Include="include\cornucopia\Solver.cpp" />
     <ClCompile Include="include\cornucopia\TwoCurveCombine.cpp" />
     <ClCompile Include="include\glm\detail\glm.cpp" />
+    <ClCompile Include="stroke_cluster\Cluster.cpp" />
     <ClCompile Include="stroke_cluster\Main.cpp" />
     <ClCompile Include="stroke_cluster\StrokeCutting.cpp" />
+    <ClCompile Include="stroke_cluster\StrokeOrientation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\andres\functional.hxx" />
@@ -632,6 +634,7 @@
     <ClInclude Include="include\nlopt\nlopt.h" />
     <ClInclude Include="include\nlopt\nlopt.hpp" />
     <ClInclude Include="stroke_cluster\ClosedGroupDetection.h" />
+    <ClInclude Include="stroke_cluster\Cluster.h" />
     <ClInclude Include="stroke_cluster\CorrelationClustering.h" />
     <ClInclude Include="stroke_cluster\getopt.h" />
     <ClInclude Include="stroke_cluster\ParameterSetting.h" />
@@ -639,6 +642,8 @@
     <ClInclude Include="stroke_cluster\RegularizedTangentFitting.h" />
     <ClInclude Include="stroke_cluster\SketchInfo.h" />
     <ClInclude Include="stroke_cluster\StrokeCutting.h" />
+    <ClInclude Include="stroke_cluster\StrokeOrientation.h" />
+    <ClInclude Include="stroke_cluster\SvgUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="include\glm\detail\func_common.inl" />

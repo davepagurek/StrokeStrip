@@ -111,6 +111,12 @@
     <ClCompile Include="include\glm\detail\glm.cpp">
       <Filter>Source Files\Libraries</Filter>
     </ClCompile>
+    <ClCompile Include="stroke_cluster\Cluster.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="stroke_cluster\StrokeOrientation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stroke_cluster\StrokeCutting.h">
@@ -1572,6 +1578,15 @@
       <Filter>Header Files\Libraries</Filter>
     </ClInclude>
     <ClInclude Include="stroke_cluster\SketchInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stroke_cluster\Cluster.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stroke_cluster\StrokeOrientation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stroke_cluster\SvgUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
