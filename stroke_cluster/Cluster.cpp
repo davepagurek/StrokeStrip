@@ -54,6 +54,18 @@ glm::dvec2 normal(const glm::dvec2& v) {
 	return glm::dvec2(-v.y, v.x);
 }
 
+double total_length(const std::vector<glm::dvec2>& points) {
+	double len = 0;
+	for (size_t i = 1; i < points.size(); ++i) {
+		len += glm::distance(points[i - 1], points[i]);
+	}
+	return len;
+}
+
+glm::dvec2 midpoint(const std::vector<glm::dvec2>& points) {
+	return points[points.size() / 2];
+}
+
 void Input::param_svg(std::ostream& os) const {
 	double padding = thickness;
 	double w = width * thickness + 2 * padding;
@@ -83,7 +95,7 @@ void Input::param_svg(std::ostream& os) const {
 	SVG::end(os);
 }
 
-void Input::orientation_svg(std::ostream& os) const {
+void Input::orientation_svg(std::ostream& os, std::function<void(std::ostream&)> cb) const {
 	double padding = thickness;
 	double w = width * thickness + 2 * padding;
 	double h = height * thickness + 2 * padding;
@@ -110,6 +122,7 @@ void Input::orientation_svg(std::ostream& os) const {
 			++stroke_num;
 		}
 	}
+	cb(os);
 	SVG::end(os);
 }
 

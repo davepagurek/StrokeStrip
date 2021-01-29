@@ -117,6 +117,9 @@
     <ClCompile Include="stroke_cluster\StrokeOrientation.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="stroke_cluster\Utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stroke_cluster\StrokeCutting.h">
@@ -612,12 +615,6 @@
       <Filter>Header Files\Libraries</Filter>
     </ClInclude>
     <ClInclude Include="include\andres\graph\hdf5\grid-graph.hxx">
-      <Filter>Header Files\Libraries</Filter>
-    </ClInclude>
-    <ClInclude Include="include\andres\ilp\gurobi.hxx">
-      <Filter>Header Files\Libraries</Filter>
-    </ClInclude>
-    <ClInclude Include="include\andres\lp\gurobi.hxx">
       <Filter>Header Files\Libraries</Filter>
     </ClInclude>
     <ClInclude Include="include\andres\ilp\gurobi-callback.hxx">
@@ -1587,6 +1584,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="stroke_cluster\SvgUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\gurobi900\win64\include\gurobi_c++.h">
+      <Filter>Header Files\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\gurobi900\win64\include\gurobi_c.h">
+      <Filter>Header Files\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="stroke_cluster\Utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

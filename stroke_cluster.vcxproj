@@ -22,6 +22,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{07642491-F22C-4361-8B95-144F699C5418}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -43,6 +44,8 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -103,20 +106,30 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <AdditionalDependencies>C:\Users\dpagurek\Downloads\vcpkg\packages\mpfr_x64-windows\lib\mpfr.lib;C:\Boost\lib\libboost_graph-vc141-mt-x64-1_71.lib;D:\Matlab\extern\lib\win64\microsoft\libMatlabEngine.lib;D:\Matlab\extern\lib\win64\microsoft\libMatlabDataArray.lib;C:\Users\dpagurek\Downloads\vcpkg\packages\nlopt_x64-windows\debug\lib\nlopt.lib;opengl32.lib;D:\mouse_capture\stroke_cluster\lib\nanovg.lib;D:\mouse_capture\stroke_cluster\external\gmp-static\gmpDebug.lib;D:\mouse_capture\stroke_cluster\lib\glfw3.lib;D:\mouse_capture\stroke_cluster\lib\glew-2.1.0\lib\Release\x64\glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gurobi81.lib;gurobi_c++mdd2017.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(GUROBI_HOME)\lib</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>D:\Matlab\extern\include;C:\Users\dpagurek\Downloads\vcpkg\packages\eigen3_x64-windows\include;C:\Users\dpagurek\Downloads\vcpkg\packages\boost-disjoint-sets_x64-windows\include;D:\mouse_capture\stroke_cluster\include\nlopt;D:\mouse_capture\stroke_cluster\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GUROBI_HOME)\include;D:\Matlab\extern\include;C:\Users\dpagurek\Downloads\vcpkg\packages\eigen3_x64-windows\include;C:\Users\dpagurek\Downloads\vcpkg\packages\boost-disjoint-sets_x64-windows\include;D:\mouse_capture\stroke_cluster\include\nlopt;D:\mouse_capture\stroke_cluster\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_USE_MATH_DEFINES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
-      <AdditionalDependencies>C:\Users\dpagurek\Downloads\vcpkg\packages\mpfr_x64-windows\lib\mpfr.lib;C:\Boost\lib\libboost_graph-vc141-mt-x64-1_71.lib;D:\Matlab\extern\lib\win64\microsoft\libMatlabEngine.lib;D:\Matlab\extern\lib\win64\microsoft\libMatlabDataArray.lib;C:\Users\dpagurek\Downloads\vcpkg\packages\nlopt_x64-windows\lib\nlopt.lib;opengl32.lib;D:\mouse_capture\stroke_cluster\lib\nanovg.lib;D:\mouse_capture\stroke_cluster\external\gmp-static\gmp.lib;D:\mouse_capture\stroke_cluster\lib\glfw3.lib;D:\mouse_capture\stroke_cluster\lib\glew32s.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(GUROBI_HOME)\lib\gurobi_c++md2017.lib;$(GUROBI_HOME)\lib\gurobi90.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>D:\Matlab\extern\include;C:\Users\dpagurek\Downloads\vcpkg\packages\eigen3_x64-windows\include;C:\Users\dpagurek\Downloads\vcpkg\packages\boost-disjoint-sets_x64-windows\include;D:\mouse_capture\stroke_cluster\include\nlopt;D:\mouse_capture\stroke_cluster\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_USE_MATH_DEFINES;GLEW_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\dpagurek\Downloads\vcpkg\packages\eigen3_x64-windows\include;D:\strokestrip\include;C:\gurobi900\win64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_USE_MATH_DEFINES;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -152,8 +165,11 @@
     <ClCompile Include="stroke_cluster\Main.cpp" />
     <ClCompile Include="stroke_cluster\StrokeCutting.cpp" />
     <ClCompile Include="stroke_cluster\StrokeOrientation.cpp" />
+    <ClCompile Include="stroke_cluster\Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="C:\gurobi900\win64\include\gurobi_c++.h" />
+    <ClInclude Include="C:\gurobi900\win64\include\gurobi_c.h" />
     <ClInclude Include="include\andres\functional.hxx" />
     <ClInclude Include="include\andres\graph\adjacency.hxx" />
     <ClInclude Include="include\andres\graph\bfs.hxx" />
@@ -191,8 +207,6 @@
     <ClInclude Include="include\andres\graph\twocut\kernighan-lin.hxx" />
     <ClInclude Include="include\andres\graph\visitor.hxx" />
     <ClInclude Include="include\andres\ilp\gurobi-callback.hxx" />
-    <ClInclude Include="include\andres\ilp\gurobi.hxx" />
-    <ClInclude Include="include\andres\lp\gurobi.hxx" />
     <ClInclude Include="include\andres\partition.hxx" />
     <ClInclude Include="include\andres\random-access-set.hxx" />
     <ClInclude Include="include\cornucopia\Algorithm.h" />
@@ -644,6 +658,7 @@
     <ClInclude Include="stroke_cluster\StrokeCutting.h" />
     <ClInclude Include="stroke_cluster\StrokeOrientation.h" />
     <ClInclude Include="stroke_cluster\SvgUtils.h" />
+    <ClInclude Include="stroke_cluster\Utils.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="include\glm\detail\func_common.inl" />

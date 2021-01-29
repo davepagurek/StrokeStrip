@@ -118,6 +118,8 @@ void preprocess_cluster(int cut_opt, int width, int height, Capture* inout_captu
 			capture.getSketchedPolyline(i).stroke_ind = re_ind++;
 		}
 	}
+
+	capture.thickness = epsilon_small;
 }
 
 glm::dvec2 to_glm_vec(const SketchUI::Point2D& pt) {

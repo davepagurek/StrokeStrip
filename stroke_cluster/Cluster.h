@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <ostream>
+#include <functional>
 #include <glm/glm.hpp>
 
 struct Cluster {
@@ -25,6 +26,8 @@ struct Cluster {
 
 glm::dvec2 tangent(const std::vector<glm::dvec2>& points, size_t i);
 glm::dvec2 normal(const glm::dvec2& v);
+glm::dvec2 midpoint(const std::vector<glm::dvec2>& points);
+double total_length(const std::vector<glm::dvec2>& points);
 
 struct Input {
 	double thickness;
@@ -33,5 +36,5 @@ struct Input {
 	std::map<int, Cluster> clusters;
 
 	void param_svg(std::ostream& os) const;
-	void orientation_svg(std::ostream& os) const;
+	void orientation_svg(std::ostream& os, std::function<void(std::ostream&)> cb = [](std::ostream&) { }) const;
 };

@@ -4,10 +4,11 @@
 #include <numeric>
 #include <limits>
 
-#include <Windows.h>
 #include <algorithm>
+#include <iostream>
 
 #include "StrokeCutting.h"
+#include "StrokeOrientation.h"
 #include "Cluster.h"
 
 void to_scap(std::string const &filename, Capture const &capture, int width, int height) {
@@ -32,7 +33,7 @@ Input from_capture(Capture capture) {
 	double max_y = -std::numeric_limits<double>::infinity();
 
 	for (auto& polyline : capture.sketchedPolylines) {
-		polyline.reparameterize(capture.thickness);
+		polyline.reparameterize(2 * capture.thickness);
 
 		for (auto& point : polyline.points) {
 			min_x = std::min(min_x, point.first.x);
@@ -86,10 +87,20 @@ int main(int argc, char** argv) {
 			max_ind = std::max(max_ind, capture.getSketchedPolyline(i).stroke_ind);
 		}
 
-
-		// 1. Preprocess
 		preprocess_cluster(1, width, height, &capture);
 		input = from_capture(capture);
+	}
+
+	// 2. Orientation
+	{
+		StrokeOrientation orientation(true);
+		orientation.orient_strokes(input);
+		std::string final_output_name = scap_filename;
+		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
+		final_output_name += "_orientation_debug.svg";
+		std::ofstream orientation_svg(final_output_name);
+		orientation.orientation_debug(orientation_svg, input);
+		orientation.flip_strokes(&input);
 	}
 
 	/*{
