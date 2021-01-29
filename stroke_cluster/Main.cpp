@@ -10,6 +10,7 @@
 #include "StrokeCutting.h"
 #include "StrokeOrientation.h"
 #include "Cluster.h"
+#include "Parameterization.h"
 
 void to_scap(std::string const &filename, Capture const &capture, int width, int height) {
 	std::ofstream scap_ofs(filename);
@@ -62,7 +63,8 @@ Input from_capture(Capture capture) {
 }
 
 int main(int argc, char** argv) {
-	std::string scap_filename(argv[argc - 1]);
+	//std::string scap_filename(argv[argc - 1]);
+	std::string scap_filename = "D:\\strokestrip\\mno_SA_cluster.scap";
 
 	Input input;
 
@@ -103,6 +105,17 @@ int main(int argc, char** argv) {
 		orientation.flip_strokes(&input);
 	}
 
+	// 3. Parameterization
+	{
+		Parameterization param(true);
+		param.parameterize(&input);
+		std::string final_output_name = scap_filename;
+		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
+		final_output_name += "_isolines.svg";
+		std::ofstream isolines_svg(final_output_name);
+		param.isolines_svg(isolines_svg, input);
+	}
+
 	/*{
 		std::string final_output_name = scap_filename;
 		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
@@ -111,13 +124,13 @@ int main(int argc, char** argv) {
 		input.param_svg(param_svg);
 	}*/
 
-	{
+	/*{
 		std::string final_output_name = scap_filename;
 		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
 		final_output_name += "_orientation.svg";
 		std::ofstream orientation_svg(final_output_name);
 		input.orientation_svg(orientation_svg);
-	}
+	}*/
 
 	/*{
 		Capture result = to_capture(input);

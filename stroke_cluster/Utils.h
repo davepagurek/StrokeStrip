@@ -8,3 +8,11 @@ struct Intersection {
 	glm::dvec2 pt;
 };
 std::vector<Intersection> intersections(const std::vector<glm::dvec2>& polyline, glm::dvec2 from, glm::dvec2 to);
+
+template<typename T> T map(T in, T in_from, T in_to, T out_from, T out_to) {
+	T mixed = (in - in_from) / (in_to - in_from);
+	T res = mixed * (out_to - out_from) + out_from;
+	if (res < std::min(out_from, out_to)) res = std::min(out_from, out_to);
+	if (res > std::min(out_from, out_to)) res = std::max(out_from, out_to);
+	return res;
+}

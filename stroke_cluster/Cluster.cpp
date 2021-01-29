@@ -39,7 +39,7 @@ std::vector<std::string> colors = {
 	"#8C510A"
 };
 
-glm::dvec2 tangent(const std::vector<glm::dvec2>& points, size_t i) {
+glm::dvec2 discrete_tangent(const std::vector<glm::dvec2>& points, size_t i) {
 	glm::dvec2 result;
 	if (i > 0) {
 		result += glm::normalize(points[i] - points[i - 1]);
@@ -48,6 +48,22 @@ glm::dvec2 tangent(const std::vector<glm::dvec2>& points, size_t i) {
 		result += glm::normalize(points[i + 1] - points[i]);
 	}
 	return glm::normalize(result);
+}
+
+glm::dvec2 tangent(const std::vector<glm::dvec2>& points, double i) {
+	size_t a = std::floor(i);
+	if (double(a) == i) return discrete_tangent(points, (size_t)i);
+
+	size_t b = std::ceil(i);
+	double mix = i - double(a);
+	return glm::normalize((1 - mix) * discrete_tangent(points, a) + mix * discrete_tangent(points, b));
+}
+
+glm::dvec2 point(const std::vector<glm::dvec2>& points, double i) {
+	size_t a = std::floor(i);
+	size_t b = std::ceil(i);
+	double mix = i - double(a);
+	return (1 - mix) * points[a] + mix * points[b];
 }
 
 glm::dvec2 normal(const glm::dvec2& v) {
@@ -121,6 +137,31 @@ void Input::orientation_svg(std::ostream& os, std::function<void(std::ostream&)>
 			}
 			++stroke_num;
 		}
+	}
+	cb(os);
+	SVG::end(os);
+}
+
+void Input::cluster_svg(std::ostream& os, std::function<void(std::ostream&)> cb) const {
+	double padding = thickness;
+	double w = width * thickness + 2 * padding;
+	double h = height * thickness + 2 * padding;
+	double x = -w / 2;
+	double y = -h / 2;
+
+	SVG::begin(os, x, y, w, h);
+	size_t cluster_num = 0;
+	for (auto& kv : clusters) {
+		std::string color(colors[cluster_num % colors.size()]);
+		for (auto& stroke : kv.second.strokes) {
+			std::vector<glm::dvec2> scaled;
+			scaled.reserve(stroke.points.size());
+			for (auto& pt : stroke.points) {
+				scaled.push_back(pt * thickness);
+			}
+			SVG::polyline(os, scaled, thickness, color);
+		}
+		++cluster_num;
 	}
 	cb(os);
 	SVG::end(os);

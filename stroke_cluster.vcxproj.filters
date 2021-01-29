@@ -120,6 +120,9 @@
     <ClCompile Include="stroke_cluster\Utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="stroke_cluster\Parameterization.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stroke_cluster\StrokeCutting.h">
@@ -974,9 +977,6 @@
     <ClInclude Include="include\cornucopia\Parameters.h">
       <Filter>Header Files\Libraries</Filter>
     </ClInclude>
-    <ClInclude Include="stroke_cluster\ParameterSetting.h">
-      <Filter>Header Files\Libraries</Filter>
-    </ClInclude>
     <ClInclude Include="include\eigen\src\geometry\ParametrizedLine.h">
       <Filter>Header Files\Libraries</Filter>
     </ClInclude>
@@ -1593,6 +1593,9 @@
       <Filter>Header Files\Libraries</Filter>
     </ClInclude>
     <ClInclude Include="stroke_cluster\Utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stroke_cluster\Parameterization.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

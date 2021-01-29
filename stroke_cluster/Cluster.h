@@ -12,19 +12,34 @@ struct Cluster {
 		std::vector<double> u;
 	};
 
-	/*struct XSecPoint {
+	struct XSecPoint {
+		size_t stroke_idx;
+		double i;
+		glm::dvec2 point;
+		glm::dvec2 to_next;
+		glm::dvec2 tangent;
+	};
 
+	struct XSecConnection {
+		size_t a_idx;
+		size_t b_idx;
+		double weight;
 	};
 
 	struct XSec {
-
-	};*/
+		std::vector<XSecPoint> points;
+		std::vector<XSecConnection> connections;
+		double u;
+		bool connector;
+	};
 
 	std::vector<Stroke> strokes;
-	//std::vector<XSec> xsecs;
+	std::vector<XSec> xsecs;
 };
 
-glm::dvec2 tangent(const std::vector<glm::dvec2>& points, size_t i);
+glm::dvec2 point(const std::vector<glm::dvec2>& points, double i);
+glm::dvec2 tangent(const std::vector<glm::dvec2>& points, double i);
+glm::dvec2 discrete_tangent(const std::vector<glm::dvec2>& points, size_t i);
 glm::dvec2 normal(const glm::dvec2& v);
 glm::dvec2 midpoint(const std::vector<glm::dvec2>& points);
 double total_length(const std::vector<glm::dvec2>& points);
@@ -37,4 +52,5 @@ struct Input {
 
 	void param_svg(std::ostream& os) const;
 	void orientation_svg(std::ostream& os, std::function<void(std::ostream&)> cb = [](std::ostream&) { }) const;
+	void cluster_svg(std::ostream& os, std::function<void(std::ostream&)> cb = [](std::ostream&) {}) const;
 };
