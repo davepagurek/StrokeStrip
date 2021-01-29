@@ -5,6 +5,7 @@
 #include <glm/gtx/norm.hpp>
 #include <algorithm>
 #include <numeric>
+#include <future>
 
 #include "SvgUtils.h"
 
@@ -24,9 +25,20 @@ void StrokeOrientation::orientation_debug(std::ostream& os, const Input& input) 
 	});
 }
 
+void StrokeOrientation::add_debug_line(DebugLine line) {
+	std::lock_guard<std::mutex> lock(debug_lock);
+	debug_lines.push_back(line);
+}
+
 void StrokeOrientation::orient_strokes(const Input& input) {
+	std::map<int, std::future<std::vector<int>>> futures;
 	for (auto& kv : input.clusters) {
-		orientations[kv.first] = orient_cluster_strokes(kv.second);
+		futures[kv.first] = std::async(std::launch::async, [&]() -> std::vector<int> {
+			return orient_cluster_strokes(kv.second);
+		});
+	}
+	for (auto& kv : input.clusters) {
+		orientations[kv.first] = futures[kv.first].get();
 	}
 }
 
@@ -59,7 +71,7 @@ std::vector<int> StrokeOrientation::orient_cluster_strokes(const Cluster& cluste
 			if (viz) {
 				if (info.weight <= 1e-6) continue;
 				std::string color = std::string(info.orientation == 1 ? "rgba(0,255,0," : "rgba(255,0,0,") + std::to_string(std::min(1.0, info.weight * 10)) + std::string(")");
-				debug_lines.push_back({ midpoint(cluster.strokes[i].points), midpoint(cluster.strokes[j].points), color });
+				add_debug_line({ midpoint(cluster.strokes[i].points), midpoint(cluster.strokes[j].points), color });
 			}
 		}
 	}
@@ -204,7 +216,7 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 
 		if (viz) {
 			for (auto& pair : policy_result.violations) {
-				debug_lines.push_back({ pair.first, pair.second, "rgba(255,0,255,0.25)" });
+				add_debug_line({ pair.first, pair.second, "rgba(255,0,255,0.25)" });
 			}
 		}
 	}
@@ -434,7 +446,7 @@ void StrokeOrientation::fill_overlaps(const Cluster::Stroke& from, const Cluster
 	if (false && viz) {
 		for (size_t i = 0; i < overlaps.size(); i++) {
 			if (overlaps[i] != -1) {
-				debug_lines.push_back({ from.points[i], to.points[overlaps[i]], "rgba(100,100,255,0.5)" });
+				add_debug_line({ from.points[i], to.points[overlaps[i]], "rgba(100,100,255,0.5)" });
 			}
 		}
 	}

@@ -93,13 +93,13 @@ int main(int argc, char** argv) {
 
 	// 2. Orientation
 	{
-		StrokeOrientation orientation(true);
+		StrokeOrientation orientation(false);
 		orientation.orient_strokes(input);
-		std::string final_output_name = scap_filename;
+		/*std::string final_output_name = scap_filename;
 		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
 		final_output_name += "_orientation_debug.svg";
 		std::ofstream orientation_svg(final_output_name);
-		orientation.orientation_debug(orientation_svg, input);
+		orientation.orientation_debug(orientation_svg, input);*/
 		orientation.flip_strokes(&input);
 	}
 

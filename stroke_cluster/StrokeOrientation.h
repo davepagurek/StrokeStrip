@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <ostream>
+#include <mutex>
 
 #include "Cluster.h"
 
@@ -19,12 +20,15 @@ private:
 	bool viz;
 	std::map<int, std::vector<int>> orientations;
 
+	std::mutex debug_lock;
+
 	struct DebugLine {
 		glm::dvec2 from;
 		glm::dvec2 to;
 		std::string color;
 	};
 	std::vector<DebugLine> debug_lines;
+	void add_debug_line(DebugLine line);
 
 	std::vector<int> orient_cluster_strokes(const Cluster& cluster);
 
