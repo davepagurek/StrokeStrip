@@ -29,6 +29,7 @@ struct Cluster {
 	struct XSec {
 		std::vector<XSecPoint> points;
 		std::vector<XSecConnection> connections;
+		size_t center_idx;
 		double u;
 		bool connector;
 	};

@@ -124,13 +124,13 @@ int main(int argc, char** argv) {
 		input.param_svg(param_svg);
 	}*/
 
-	/*{
+	{
 		std::string final_output_name = scap_filename;
 		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
 		final_output_name += "_orientation.svg";
 		std::ofstream orientation_svg(final_output_name);
 		input.orientation_svg(orientation_svg);
-	}*/
+	}
 
 	/*{
 		Capture result = to_capture(input);

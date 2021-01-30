@@ -16,6 +16,6 @@ private:
 	GRBEnv grb;
 	void parameterize_cluster(Cluster* cluster);
 
-	std::vector<Cluster::XSec> orthogonal_xsecs(const Cluster& cluster);
+	std::vector<Cluster::XSec> orthogonal_xsecs(const Cluster& cluster, double angle_tolerance = 0.0);
 	Cluster::XSec orthogonal_xsec_at(const Cluster& cluster, size_t stroke, double i);
 };

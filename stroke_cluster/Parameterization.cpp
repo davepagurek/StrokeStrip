@@ -4,6 +4,8 @@
 #include <sstream>
 #include <iomanip>
 #include <cmath>
+#include <deque>
+#include <glm/gtx/norm.hpp>
 
 #include "Utils.h"
 #include "SvgUtils.h"
@@ -63,12 +65,158 @@ void Parameterization::parameterize_cluster(Cluster* cluster) {
 	cluster->xsecs = orthogonal_xsecs(*cluster);
 }
 
-std::vector<Cluster::XSec> Parameterization::orthogonal_xsecs(const Cluster& cluster) {
+std::vector<Cluster::XSec> Parameterization::orthogonal_xsecs(const Cluster& cluster, double angle_tolerance) {
+	const double TARGET_ANGLE = 20. / 180. * M_PI;
+	const double MIN_GAP_CUTOFF = 15.;
+	const double MAX_GAP_CUTOFF = 30.;
+
 	std::vector<Cluster::XSec> xsecs;
 
 	for (size_t stroke = 0; stroke < cluster.strokes.size(); ++stroke) {
 		for (size_t i = 0; i < cluster.strokes[stroke].points.size(); ++i) {
 			xsecs.push_back(orthogonal_xsec_at(cluster, stroke, i));
+		}
+	}
+
+	// Local filtering
+
+	// 1. Angle filtering
+	{
+		struct AngleSample {
+			glm::dvec2 mid;
+			double angle;
+		};
+		std::vector<AngleSample> samples;
+		for (auto& xsec : xsecs) {
+			for (size_t i = 1; i < xsec.points.size(); ++i) {
+				samples.push_back({
+					(xsec.points[i - 1].point + xsec.points[i].point) * 0.5,
+					std::acos(glm::dot(xsec.points[i - 1].tangent, xsec.points[i].tangent)),
+				});
+			}
+		}
+		for (auto& xsec : xsecs) {
+			std::deque<AngleSample> neighbourhood;
+			double r_sq = std::pow(std::max(30.0, glm::distance(xsec.points.front().point, xsec.points.back().point)), 2);
+
+			auto sample_within_radius = [&](const AngleSample& sample) {
+				for (auto& point : xsec.points) {
+					if (glm::distance2(point.point, sample.mid) <= r_sq) {
+						return true;
+					}
+				}
+				return false;
+			};
+
+			// TODO k-d tree lookup?
+			for (auto& sample : samples) {
+				if (sample_within_radius(sample)) {
+					neighbourhood.push_back(sample);
+				}
+			}
+
+			if (neighbourhood.empty()) continue;
+
+			// Sort by angle descending
+			std::sort(neighbourhood.begin(), neighbourhood.end(), [](const AngleSample& a, const AngleSample& b) { return a.angle > b.angle; });
+
+			// Remove samples until the `angle_tolerence` percentile is below the target value
+			double max_angle = neighbourhood.front().angle;
+			if (neighbourhood.back().angle <= TARGET_ANGLE) {
+				while (!neighbourhood.empty() && neighbourhood[int(angle_tolerance * (neighbourhood.size() - 1))].angle > TARGET_ANGLE) {
+					neighbourhood.pop_front();
+					max_angle = neighbourhood.front().angle;
+				}
+			}
+
+			// Remove connections above the threshold to the right of the center
+			for (int i = xsec.center_idx + 1; i < xsec.points.size(); ++i) {
+				if (std::acos(glm::dot(xsec.points[i - 1].tangent, xsec.points[i].tangent)) > max_angle) {
+					xsec.points = std::vector<Cluster::XSecPoint>(xsec.points.begin(), xsec.points.begin() + i);
+					break;
+				}
+			}
+			// Remove connections above the threshold to the left of the center
+			for (int i = xsec.center_idx - 1; i >= 0; --i) {
+				if (std::acos(glm::dot(xsec.points[i + 1].tangent, xsec.points[i].tangent)) > max_angle) {
+					xsec.points = std::vector<Cluster::XSecPoint>(xsec.points.begin() + i + 1, xsec.points.begin() + xsec.center_idx + 1);
+					xsec.center_idx -= i;
+					break;
+				}
+			}
+		}
+	}
+
+	// 2. Gap filtering
+	{
+		struct GapSample {
+			glm::dvec2 mid;
+			double gap_sq;
+		};
+		std::vector<GapSample> samples;
+		for (auto& xsec : xsecs) {
+			for (size_t i = 1; i < xsec.points.size(); ++i) {
+				samples.push_back({
+					(xsec.points[i - 1].point + xsec.points[i].point) * 0.5,
+					glm::distance2(xsec.points[i - 1].point, xsec.points[i].point),
+				});
+			}
+		}
+		for (auto& xsec : xsecs) {
+			std::deque<GapSample> neighbourhood;
+			double r_sq = std::pow(std::max(100.0, glm::distance(xsec.points.front().point, xsec.points.back().point)), 2);
+
+			auto sample_within_radius = [&](const GapSample& sample) {
+				for (auto& point : xsec.points) {
+					if (glm::distance2(point.point, sample.mid) <= r_sq) {
+						return true;
+					}
+				}
+				return false;
+			};
+
+			// TODO k-d tree lookup?
+			for (auto& sample : samples) {
+				if (sample_within_radius(sample)) {
+					neighbourhood.push_back(sample);
+				}
+			}
+
+			if (neighbourhood.empty()) continue;
+
+			// Get median gap
+			size_t median_offset = neighbourhood.size() / 2;
+			std::nth_element(
+				neighbourhood.begin(),
+				neighbourhood.begin() + median_offset,
+				neighbourhood.end(),
+				[](const GapSample& a, const GapSample& b) { return a.gap_sq < b.gap_sq; });
+			double median_gap_sq = neighbourhood[median_offset].gap_sq;
+			double gap_cutoff = std::min(MAX_GAP_CUTOFF*MAX_GAP_CUTOFF, std::max(MIN_GAP_CUTOFF*MIN_GAP_CUTOFF, 1.2*1.2*median_gap_sq));
+
+			// Remove connections above the threshold to the right of the center
+			for (int i = xsec.center_idx + 1; i < xsec.points.size(); ++i) {
+				if (glm::distance2(xsec.points[i - 1].point, xsec.points[i].point) > gap_cutoff) {
+					xsec.points = std::vector<Cluster::XSecPoint>(xsec.points.begin(), xsec.points.begin() + i);
+					break;
+				}
+			}
+			// Remove connections above the threshold to the left of the center
+			for (int i = xsec.center_idx - 1; i >= 0; --i) {
+				if (glm::distance2(xsec.points[i + 1].point, xsec.points[i].point) > gap_cutoff) {
+					xsec.points = std::vector<Cluster::XSecPoint>(xsec.points.begin() + i + 1, xsec.points.begin() + xsec.center_idx + 1);
+					xsec.center_idx -= i;
+					break;
+				}
+			}
+		}
+	}
+
+	for (auto& xsec : xsecs) {
+		for (size_t i = 0; i < xsec.points.size(); ++i) {
+			for (size_t j = i + 1; j < xsec.points.size(); ++j) {
+				xsec.connections.push_back({ i, j, 1.0 });
+			}
 		}
 	}
 
@@ -130,7 +278,7 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 					intersection.i,
 					intersection.pt,
 					to_next,
-					tangent(cluster.strokes[j].points, j)
+					tangent(cluster.strokes[j].points, intersection.i)
 				},
 				glm::dot(intersection.pt - origin, ortho)
 			});
@@ -139,7 +287,7 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 
 	std::sort(potential_ints.begin(), potential_ints.end(), [](const PotentialInt& a, const PotentialInt& b) { return a.signed_dist < b.signed_dist; });
 
-	if (!potential_ints.size() > 1) {
+	if (potential_ints.size() > 1) {
 		// Cut off intersections after any bad tangent angle
 		int first_bad_tangent = -1;
 		for (int n = potential_ints.size() - 1; n >= 0; --n) {
@@ -156,16 +304,14 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 			}
 		}
 
-		potential_ints = std::vector<PotentialInt>(potential_ints.begin() + (1 + first_bad_tangent), potential_ints.begin() + (last_bad_tangent - 1));
+		potential_ints = std::vector<PotentialInt>(potential_ints.begin() + (1 + first_bad_tangent), potential_ints.begin() + last_bad_tangent);
 	}
 
-	Cluster::XSec xsec = { {}, {}, 0.0, false };
+	Cluster::XSec xsec = { {}, {}, 0, 0.0, false };
 	for (auto& potential_int : potential_ints) {
 		xsec.points.push_back(potential_int.point);
-	}
-	for (size_t a = 0; a < xsec.points.size(); ++a) {
-		for (size_t b = a + 1; b < xsec.points.size(); ++b) {
-			xsec.connections.push_back({ a, b, 1.0 });
+		if (xsec.points.back().stroke_idx == stroke && xsec.points.back().i == i) {
+			xsec.center_idx = xsec.points.size() - 1;
 		}
 	}
 
