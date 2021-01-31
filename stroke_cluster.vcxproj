@@ -106,7 +106,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <AdditionalDependencies>gurobi81.lib;gurobi_c++mdd2017.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gurobi90.lib;gurobi_c++mdd2017.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(GUROBI_HOME)\lib</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
@@ -124,7 +124,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\dpagurek\Downloads\vcpkg\packages\eigen3_x64-windows\include;D:\strokestrip\include;C:\gurobi900\win64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\dpagurek\Downloads\vcpkg\packages\eigen3_x64-windows\include;D:\strokestrip\include;$(GUROBI_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_USE_MATH_DEFINES;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>

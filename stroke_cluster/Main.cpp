@@ -34,7 +34,7 @@ Input from_capture(Capture capture) {
 	double max_y = -std::numeric_limits<double>::infinity();
 
 	for (auto& polyline : capture.sketchedPolylines) {
-		polyline.reparameterize(2 * capture.thickness);
+		polyline.reparameterize(3 * capture.thickness);
 
 		for (auto& point : polyline.points) {
 			min_x = std::min(min_x, point.first.x);

@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <cmath>
 #include <deque>
+#include <unordered_set>
 #include <glm/gtx/norm.hpp>
 
 #include "Utils.h"
@@ -139,8 +140,8 @@ std::vector<Cluster::XSec> Parameterization::orthogonal_xsecs(const Cluster& clu
 			// Remove connections above the threshold to the left of the center
 			for (int i = xsec.center_idx - 1; i >= 0; --i) {
 				if (std::acos(glm::dot(xsec.points[i + 1].tangent, xsec.points[i].tangent)) > max_angle) {
-					xsec.points = std::vector<Cluster::XSecPoint>(xsec.points.begin() + i + 1, xsec.points.begin() + xsec.center_idx + 1);
-					xsec.center_idx -= i;
+					xsec.points = std::vector<Cluster::XSecPoint>(xsec.points.begin() + i + 1, xsec.points.end());
+					xsec.center_idx -= i + 1;
 					break;
 				}
 			}
@@ -150,26 +151,32 @@ std::vector<Cluster::XSec> Parameterization::orthogonal_xsecs(const Cluster& clu
 	// 2. Gap filtering
 	{
 		struct GapSample {
-			glm::dvec2 mid;
+			glm::dvec2 left;
+			glm::dvec2 right;
 			double gap_sq;
 		};
 		std::vector<GapSample> samples;
 		for (auto& xsec : xsecs) {
 			for (size_t i = 1; i < xsec.points.size(); ++i) {
 				samples.push_back({
-					(xsec.points[i - 1].point + xsec.points[i].point) * 0.5,
-					glm::distance2(xsec.points[i - 1].point, xsec.points[i].point),
+					xsec.points[i - 1].point,
+					xsec.points[i].point,
+					glm::distance2(xsec.points.front().point, xsec.points.back().point),
 				});
 			}
 		}
 		for (auto& xsec : xsecs) {
-			std::deque<GapSample> neighbourhood;
-			double r_sq = std::pow(std::max(100.0, glm::distance(xsec.points.front().point, xsec.points.back().point)), 2);
+			if (xsec.points.size() == 1) continue;
+
+			std::unordered_set<double> neighbourhood;
+			double r_sq = std::max(100.0*100.0, glm::distance2(xsec.points.front().point, xsec.points.back().point));
 
 			auto sample_within_radius = [&](const GapSample& sample) {
 				for (auto& point : xsec.points) {
-					if (glm::distance2(point.point, sample.mid) <= r_sq) {
-						return true;
+					for (auto& other : { sample.left, sample.right }) {
+						if (glm::distance2(point.point, other) <= r_sq) {
+							return true;
+						}
 					}
 				}
 				return false;
@@ -178,20 +185,20 @@ std::vector<Cluster::XSec> Parameterization::orthogonal_xsecs(const Cluster& clu
 			// TODO k-d tree lookup?
 			for (auto& sample : samples) {
 				if (sample_within_radius(sample)) {
-					neighbourhood.push_back(sample);
+					neighbourhood.insert(sample.gap_sq);
 				}
 			}
 
 			if (neighbourhood.empty()) continue;
 
 			// Get median gap
-			size_t median_offset = neighbourhood.size() / 2;
+			std::vector<double> gaps(neighbourhood.begin(), neighbourhood.end());
+			size_t median_offset = gaps.size() * 0.75;
 			std::nth_element(
-				neighbourhood.begin(),
-				neighbourhood.begin() + median_offset,
-				neighbourhood.end(),
-				[](const GapSample& a, const GapSample& b) { return a.gap_sq < b.gap_sq; });
-			double median_gap_sq = neighbourhood[median_offset].gap_sq;
+				gaps.begin(),
+				gaps.begin() + median_offset,
+				gaps.end());
+			double median_gap_sq = gaps[median_offset];
 			double gap_cutoff = std::min(MAX_GAP_CUTOFF*MAX_GAP_CUTOFF, std::max(MIN_GAP_CUTOFF*MIN_GAP_CUTOFF, 1.2*1.2*median_gap_sq));
 
 			// Remove connections above the threshold to the right of the center
@@ -204,8 +211,8 @@ std::vector<Cluster::XSec> Parameterization::orthogonal_xsecs(const Cluster& clu
 			// Remove connections above the threshold to the left of the center
 			for (int i = xsec.center_idx - 1; i >= 0; --i) {
 				if (glm::distance2(xsec.points[i + 1].point, xsec.points[i].point) > gap_cutoff) {
-					xsec.points = std::vector<Cluster::XSecPoint>(xsec.points.begin() + i + 1, xsec.points.begin() + xsec.center_idx + 1);
-					xsec.center_idx -= i;
+					xsec.points = std::vector<Cluster::XSecPoint>(xsec.points.begin() + i + 1, xsec.points.end());
+					xsec.center_idx -= i + 1;
 					break;
 				}
 			}
@@ -224,7 +231,7 @@ std::vector<Cluster::XSec> Parameterization::orthogonal_xsecs(const Cluster& clu
 }
 
 Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_t stroke, double i) {
-	const double SCALE = 50.;
+	const double SCALE = 100.;
 
 	auto& stroke_points = cluster.strokes[stroke].points;
 

@@ -69,7 +69,6 @@ std::vector<int> StrokeOrientation::orient_cluster_strokes(const Cluster& cluste
 			objective += info.weight * info.orientation * (vars[i] - vars[j]) * (vars[i] - vars[j]);
 
 			if (viz) {
-				if (info.weight <= 1e-6) continue;
 				std::string color = std::string(info.orientation == 1 ? "rgba(0,255,0," : "rgba(255,0,0,") + std::to_string(std::min(1.0, info.weight * 10)) + std::string(")");
 				add_debug_line({ midpoint(cluster.strokes[i].points), midpoint(cluster.strokes[j].points), color });
 			}
@@ -207,7 +206,10 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 			result.weight = 2e-2;
 		}
 		else {
-			double angle = std::accumulate(policy_result.connection_angles.begin(), policy_result.connection_angles.end(), 0);
+			double angle = std::accumulate(
+				policy_result.connection_angles.begin(),
+				policy_result.connection_angles.end(),
+				0) / policy_result.connection_angles.size();
 			result.weight = weight_for_angle(angle) + 1e-2;
 			double len_ratio = double(policy_result.connection_angles.size()) / (0.95 * std::min(a.points.size(), b.points.size()));
 			len_ratio = std::max(0.5, len_ratio);
@@ -226,7 +228,7 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 		size_t num_dists = policy_result.connection_dists.size();
 		int off = 0.6 * num_dists;
 		std::nth_element(policy_result.connection_dists.begin(), policy_result.connection_dists.begin() + off, policy_result.connection_dists.end());
-		result.weight /= 1. + policy_result.connection_dists[off]* policy_result.connection_dists[off];
+		result.weight /= 1. + (0.5 * 0.5 * policy_result.connection_dists[off] * policy_result.connection_dists[off]);
 		//std::cout << "Dist: " << policy_result.connection_dists[off] << "; weight: " << result.weight << std::endl;
 	}
 
@@ -280,6 +282,7 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 		int i;
 		int j;
 		int idx_dist;
+		double xsec_len_sq;
 	};
 	auto check_violations = [&](const Cluster::Stroke& from, const Cluster::Stroke& to, const std::vector<int>& overlaps, const std::vector<int>& other_overlaps) {
 		size_t n = overlaps.size();
@@ -296,7 +299,12 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 				// Neighbour to our left
 				for (int other_i = int(i) - 1; other_i >= 0; --other_i) {
 					if (overlaps[other_i] != -1) {
-						neighbours.push_back({ other_i, overlaps[other_i], abs(int(i) - other_i) });
+						neighbours.push_back({
+							other_i,
+							overlaps[other_i],
+							abs(int(i) - other_i),
+							glm::distance2(from.points[other_i], to.points[overlaps[other_i]])
+						});
 						break;
 					}
 				}
@@ -304,7 +312,12 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 				// Neighbour to our right
 				for (int other_i = i + 1; other_i < overlaps.size(); ++other_i) {
 					if (overlaps[other_i] != -1) {
-						neighbours.push_back({ other_i, overlaps[other_i], abs(int(i) - other_i) });
+						neighbours.push_back({
+							other_i,
+							overlaps[other_i],
+							abs(int(i) - other_i),
+							glm::distance2(from.points[other_i], to.points[overlaps[other_i]])
+						});
 						break;
 					}
 				}
@@ -322,14 +335,30 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 					}
 				}
 				if (closest_j_left != -1) {
-					neighbours.push_back({ other_overlaps[closest_j_left], closest_j_left, std::abs(int(i) - other_overlaps[closest_j_left]) });
+					neighbours.push_back({
+						other_overlaps[closest_j_left],
+						closest_j_left,
+						std::abs(int(i) - other_overlaps[closest_j_left]),
+						glm::distance2(from.points[other_overlaps[closest_j_left]], to.points[closest_j_left])
+					});
 				}
 				if (closest_j_right != -1) {
-					neighbours.push_back({ other_overlaps[closest_j_right], closest_j_right, std::abs(int(i) - other_overlaps[closest_j_right]) });
+					neighbours.push_back({
+						other_overlaps[closest_j_right],
+						closest_j_right,
+						std::abs(int(i) - other_overlaps[closest_j_right]),
+						glm::distance2(from.points[other_overlaps[closest_j_right]], to.points[closest_j_right])
+					});
 				}
 
 				if (neighbours.empty()) continue;
-				auto neighbour = *std::min_element(neighbours.begin(), neighbours.end(), [](const Neighbour& a, const Neighbour& b) { return b.idx_dist - a.idx_dist;  });
+				auto neighbour = *std::min_element(
+					neighbours.begin(),
+					neighbours.end(),
+					[](const Neighbour& a, const Neighbour& b) {
+						if (a.idx_dist != b.idx_dist) return a.idx_dist < b.idx_dist;
+						return a.xsec_len_sq < b.xsec_len_sq;
+					});
 				int dist = i - neighbour.i;
 				int j = neighbour.j + dist;
 
