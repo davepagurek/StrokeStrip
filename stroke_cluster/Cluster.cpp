@@ -4,6 +4,8 @@
 #include <iomanip>
 #include <vector>
 #include <string>
+#include <iostream>
+#include <algorithm>
 
 std::vector<std::string> colors = {
 	"#9E0142",
@@ -91,6 +93,13 @@ void Input::param_svg(std::ostream& os) const {
 
 	SVG::begin(os, x, y, w, h);
 	for (auto& kv : clusters) {
+		double max_u = -std::numeric_limits<double>::infinity();
+		for (auto& stroke : kv.second.strokes) {
+			for (double u : stroke.u) {
+				max_u = std::max(max_u, u);
+			}
+		}
+
 		for (auto& stroke : kv.second.strokes) {
 			std::vector<glm::dvec2> scaled;
 			scaled.reserve(stroke.points.size());
@@ -101,9 +110,9 @@ void Input::param_svg(std::ostream& os) const {
 				std::stringstream ss;
 				ss << "#";
 				ss << std::setfill('0') << std::setw(2);
-				ss << std::hex << int(stroke.u[i] * 255); // red
+				ss << std::hex << int(stroke.u[i]/max_u * 255); // red
 				ss << "00"; // green
-				ss << std::hex << int(255 - stroke.u[i] * 255); // blue
+				ss << std::hex << int(255 - stroke.u[i]/max_u * 255); // blue
 				SVG::line(os, scaled[i].x, scaled[i].y, scaled[i + 1].x, scaled[i + 1].y, thickness, ss.str());
 			}
 		}
@@ -167,3 +176,57 @@ void Input::cluster_svg(std::ostream& os, std::function<void(std::ostream&)> cb)
 	SVG::end(os);
 }
 
+double Cluster::XSec::distance_weight(size_t i) const {
+	if (points.size() == 1) return 1.0;
+
+	double weight = 0.0;
+	if (i == 0) {
+		weight += glm::distance(points[0].point, points[1].point);
+	}
+	else {
+		weight += glm::distance(points[i - 1].point, points[i].point);
+	}
+
+	if (i == points.size() - 1) {
+		weight += glm::distance(points[points.size() - 2].point, points[points.size() - 1].point);
+	}
+	else {
+		weight += glm::distance(points[i].point, points[i + 1].point);
+	}
+
+	return weight;
+}
+
+glm::dvec2 Cluster::XSec::avg_tangent() const {
+	if (points.size() == 1) return points.front().tangent;
+
+	glm::dvec2 sum;
+
+	std::vector<double> dists(points.size(), 0.0);
+	for (size_t i = 0; i < points.size() - 1; ++i) {
+		dists[i] = glm::distance(points[i].point, points[i + 1].point);
+	}
+	for (size_t i = 0; i < points.size(); ++i) {
+		double weight = 0.0;
+		if (i == 0) {
+			weight += dists[0];
+		}
+		else {
+			weight += dists[i - 1];
+		}
+		if (i == points.size() - 1) {
+			weight += dists.back();
+		}
+		else {
+			weight += dists[i + 1];
+		}
+
+		sum += weight * points[i].tangent;
+	}
+
+	sum = glm::normalize(sum);
+	if (glm::any(glm::isnan(sum))) {
+		sum = glm::dvec2();
+	}
+	return sum;
+}

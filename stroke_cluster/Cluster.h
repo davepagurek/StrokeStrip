@@ -32,6 +32,9 @@ struct Cluster {
 		size_t center_idx;
 		double u;
 		bool connector;
+
+		double distance_weight(size_t i) const;
+		glm::dvec2 avg_tangent() const;
 	};
 
 	std::vector<Stroke> strokes;

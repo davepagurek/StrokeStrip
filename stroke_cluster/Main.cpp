@@ -116,13 +116,13 @@ int main(int argc, char** argv) {
 		param.isolines_svg(isolines_svg, input);
 	}
 
-	/*{
+	{
 		std::string final_output_name = scap_filename;
 		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
 		final_output_name += "_rb.svg";
 		std::ofstream param_svg(final_output_name);
 		input.param_svg(param_svg);
-	}*/
+	}
 
 	{
 		std::string final_output_name = scap_filename;

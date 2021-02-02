@@ -12,6 +12,7 @@
 const int MAX_VIOLATIONS = 20;
 
 StrokeOrientation::StrokeOrientation(bool viz): grb(true), viz(viz) {
+	grb.set(GRB_IntParam_LogToConsole, 0);
 	grb.start();
 }
 

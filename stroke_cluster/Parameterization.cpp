@@ -12,6 +12,7 @@
 #include "SvgUtils.h"
 
 Parameterization::Parameterization(bool viz) : viz(viz), grb(true) {
+	//grb.set(GRB_IntParam_LogToConsole, 0);
 	grb.start();
 }
 
@@ -64,6 +65,184 @@ void Parameterization::isolines_svg(std::ostream& os, const Input& input) {
 
 void Parameterization::parameterize_cluster(Cluster* cluster) {
 	cluster->xsecs = orthogonal_xsecs(*cluster);
+	params_from_xsecs(cluster, true, nullptr);
+}
+
+GRBLinExpr l1_norm(GRBModel* model, const std::vector<GRBLinExpr>& x) {
+	// min ||x||_1
+	//
+	// ...is equivalent to:
+	//
+	// min t
+	// s.t.
+	// x_i <= y_i,
+	// -x_i <= y_i,
+	// \sum_i y_i = t
+
+	GRBLinExpr sum_y = 0.0;
+	auto t = model->addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+	std::vector<GRBVar> y;
+	y.reserve(x.size());
+	for (auto& term : x) {
+		y.push_back(model->addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS));
+		sum_y += y.back();
+		model->addConstr(term <= y.back());
+		model->addConstr(-term <= y.back());
+	}
+	model->addConstr(sum_y == t);
+
+	return t;
+}
+
+GRBQuadExpr l2_norm_sq(GRBModel* model, const std::vector<GRBLinExpr>& x) {
+	GRBQuadExpr result = 0.0;
+	for (auto& term : x) {
+		result += term * term;
+	}
+
+	return result;
+}
+
+void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster::XSec* cut) {
+	GRBModel model(grb);
+
+	std::vector<std::vector<GRBVar>> param_vars;
+	for (auto& stroke : cluster->strokes) {
+		param_vars.emplace_back();
+		auto& vars = param_vars.back();
+		for (size_t i = 0; i < stroke.points.size(); ++i) {
+			//std::string name = std::to_string(param_vars.size()-1) + "." + std::to_string(i);
+			vars.push_back(model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS));
+		}
+	}
+
+	std::vector<GRBLinExpr> velocity_terms;
+	std::vector<GRBLinExpr> alignment_terms;
+	for (auto& xsec : cluster->xsecs) {
+		glm::dvec2 tangent = xsec.avg_tangent();
+
+		// 1. Add velocity term
+		{
+			velocity_terms.emplace_back();
+			auto& velocity_term = velocity_terms.back();
+
+			double total_weight = 0.0;
+			for (size_t i = 0; i < xsec.points.size(); ++i) {
+				auto& point = xsec.points[i];
+				double weight = xsec.distance_weight(i);
+				total_weight += weight;
+				double coefficient = weight * glm::dot(point.tangent, tangent) / glm::length(point.to_next);
+				if (std::isnan(coefficient)) {
+					throw "coefficient NaN";
+				}
+
+				int a = std::floor(point.i);
+				int b = std::ceil(point.i);
+				double mix = point.i - a;
+				if (a == b) {
+					if (b == cluster->strokes[point.stroke_idx].points.size() - 1) {
+						continue;
+					}
+					else {
+						++b;
+					}
+				}
+				velocity_term += coefficient * (1 - mix) *
+					(param_vars[point.stroke_idx][b] - param_vars[point.stroke_idx][a]);
+
+			}
+
+			if (total_weight > 0) {
+				velocity_term /= total_weight;
+				velocity_term -= 1.0;
+			}
+			else {
+				velocity_terms.pop_back();
+			}
+		}
+
+		// 2. Add alignment terms
+		{
+			for (auto& connection : xsec.connections) {
+				auto& pt_a = xsec.points[connection.a_idx];
+				auto& pt_b = xsec.points[connection.b_idx];
+
+				double mix_a = pt_a.i - std::floor(pt_a.i);
+				GRBLinExpr u_a = (1 - mix_a) * param_vars[pt_a.stroke_idx][std::floor(pt_a.i)] +
+					mix_a * param_vars[pt_a.stroke_idx][std::ceil(pt_a.i)];
+
+				double mix_b = pt_b.i - std::floor(pt_b.i);
+				GRBLinExpr u_b = (1 - mix_b) * param_vars[pt_b.stroke_idx][std::floor(pt_b.i)] +
+					mix_b * param_vars[pt_b.stroke_idx][std::ceil(pt_b.i)];
+
+				double proj_dist = glm::dot(pt_a.point - pt_b.point, tangent);
+				alignment_terms.push_back(connection.weight * ((u_a - u_b) - proj_dist));
+			}
+		}
+	}
+
+	// 3. Enforce monotonicity
+	for (size_t stroke_idx = 0; stroke_idx < cluster->strokes.size(); ++stroke_idx) {
+		auto& stroke = cluster->strokes[stroke_idx];
+		for (size_t i = 0; i < stroke.points.size() - 1; ++i) {
+			model.addConstr(
+				param_vars[stroke_idx][i + 1] - param_vars[stroke_idx][i] >=
+					0.5 * glm::distance(stroke.points[i + 1], stroke.points[i]));
+		}
+	}
+
+	// 4. Boundary
+	//GRBQuadExpr boundary = param_vars[0][0] * param_vars[0][0];
+	model.addConstr(param_vars[0][0] == 0.0);
+
+	GRBQuadExpr objective;
+	if (initial) {
+		objective = l2_norm_sq(&model, velocity_terms) + 1e-5 * l1_norm(&model, alignment_terms);
+	}
+	else {
+		objective = l2_norm_sq(&model, velocity_terms) + l2_norm_sq(&model, alignment_terms);
+	}
+
+	try {
+		model.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
+		model.set(GRB_IntParam_DualReductions, 0);
+		model.setObjective(objective, GRB_MINIMIZE);
+		model.optimize();
+
+		double min_u = std::numeric_limits<double>::infinity();
+		for (size_t stroke_idx = 0; stroke_idx < cluster->strokes.size(); ++stroke_idx) {
+			auto& stroke = cluster->strokes[stroke_idx];
+			for (size_t i = 0; i < stroke.points.size(); ++i) {
+				stroke.u[i] = param_vars[stroke_idx][i].get(GRB_DoubleAttr_X);
+				min_u = std::min(min_u, stroke.u[i]);
+			}
+		}
+		for (auto& stroke : cluster->strokes) {
+			for (size_t i = 0; i < stroke.u.size(); ++i) {
+				stroke.u[i] -= min_u;
+			}
+		}
+	}
+	catch (GRBException e) {
+		model.computeIIS();
+		std::cout << "\nThe following constraint(s) "
+			<< "cannot be satisfied:" << std::endl;
+		GRBConstr* c = model.getConstrs();
+		for (int i = 0; i < model.get(GRB_IntAttr_NumConstrs); ++i)
+		{
+			if (c[i].get(GRB_IntAttr_IISConstr) == 1)
+			{
+				std::cout << c[i].get(GRB_StringAttr_ConstrName) << std::endl;
+			}
+		}
+		std::cout << "Done" << std::endl;
+
+		model.write("D:\\model.lp");
+
+		std::cout << "Error code = " << e.getErrorCode() << std::endl;
+		std::cout << e.getMessage() << std::endl;
+		throw e;
+	}
 }
 
 std::vector<Cluster::XSec> Parameterization::orthogonal_xsecs(const Cluster& cluster, double angle_tolerance) {
@@ -236,7 +415,6 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 	auto& stroke_points = cluster.strokes[stroke].points;
 
 	size_t a = std::floor(i);
-	size_t b = std::ceil(i);
 	double mix = i - double(a);
 	glm::dvec2 origin = point(stroke_points, i);
 	glm::dvec2 tan = tangent(stroke_points, i);
@@ -271,12 +449,12 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 		for (auto& intersection : ints) {
 
 			// Ignore origin point
-			if (i == j && std::abs(intersection.i - i) > 1e-1) continue;
+			if (stroke == j && std::abs(intersection.i - i) < 1e-1) continue;
 
 			glm::dvec2 to_next;
 			size_t floor_j = std::floor(j);
 			if (floor_j < cluster.strokes[j].points.size() - 1) {
-				to_next = (j - double(floor_j)) * (cluster.strokes[j].points[floor_j + 1] - cluster.strokes[j].points[floor_j]);
+				to_next = (1 - (j - double(floor_j))) * (cluster.strokes[j].points[floor_j + 1] - cluster.strokes[j].points[floor_j]);
 			}
 
 			potential_ints.push_back({
