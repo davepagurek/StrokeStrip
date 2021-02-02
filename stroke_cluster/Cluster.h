@@ -39,6 +39,8 @@ struct Cluster {
 
 	std::vector<Stroke> strokes;
 	std::vector<XSec> xsecs;
+
+	double max_u() const;
 };
 
 glm::dvec2 point(const std::vector<glm::dvec2>& points, double i);

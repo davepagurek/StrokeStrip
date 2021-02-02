@@ -62,3 +62,6 @@ std::vector<Intersection> intersections(const std::vector<glm::dvec2>& polyline,
 	return intersections;
 }
 
+double gaussian(double x, double sigma, double mu) {
+	return std::exp(-0.5 * std::pow((x - mu) / sigma, 2));
+}

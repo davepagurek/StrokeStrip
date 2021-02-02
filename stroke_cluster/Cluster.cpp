@@ -93,12 +93,7 @@ void Input::param_svg(std::ostream& os) const {
 
 	SVG::begin(os, x, y, w, h);
 	for (auto& kv : clusters) {
-		double max_u = -std::numeric_limits<double>::infinity();
-		for (auto& stroke : kv.second.strokes) {
-			for (double u : stroke.u) {
-				max_u = std::max(max_u, u);
-			}
-		}
+		double max_u = kv.second.max_u();
 
 		for (auto& stroke : kv.second.strokes) {
 			std::vector<glm::dvec2> scaled;
@@ -112,6 +107,7 @@ void Input::param_svg(std::ostream& os) const {
 				ss << std::setfill('0') << std::setw(2);
 				ss << std::hex << int(stroke.u[i]/max_u * 255); // red
 				ss << "00"; // green
+				ss << std::setfill('0') << std::setw(2);
 				ss << std::hex << int(255 - stroke.u[i]/max_u * 255); // blue
 				SVG::line(os, scaled[i].x, scaled[i].y, scaled[i + 1].x, scaled[i + 1].y, thickness, ss.str());
 			}
@@ -229,4 +225,14 @@ glm::dvec2 Cluster::XSec::avg_tangent() const {
 		sum = glm::dvec2();
 	}
 	return sum;
+}
+
+double Cluster::max_u() const {
+	double result = -std::numeric_limits<double>::infinity();
+	for (auto& stroke : strokes) {
+		for (double u : stroke.u) {
+			result = std::max(result, u);
+		}
+	}
+	return result;
 }

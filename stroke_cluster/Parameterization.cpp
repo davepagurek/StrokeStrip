@@ -26,6 +26,9 @@ void Parameterization::parameterize(Input* input) {
 	for (auto& kv : input->clusters) {
 		futures[kv.first].get();
 	}
+	/*for (auto& kv : input->clusters) {
+		parameterize_cluster(&kv.second);
+	}*/
 }
 
 void Parameterization::isolines_svg(std::ostream& os, const Input& input) {
@@ -36,15 +39,14 @@ void Parameterization::isolines_svg(std::ostream& os, const Input& input) {
 					if (std::abs(int(connection.a_idx) - int(connection.b_idx)) == 1) {
 						std::stringstream ss;
 						ss << "#";
-						ss << std::setfill('0') << std::setw(2);
 						if (connection.weight > 0.5) {
-							ss << std::hex << int(map(connection.weight, 0.5, 1.0, 255.0, 0.0)); // red
-							ss << std::hex << int(map(connection.weight, 0.5, 1.0, 255.0 / 2.0, 255.0)); // green
+							ss << std::setfill('0') << std::setw(2) << std::hex << int(map(connection.weight, 0.5, 1.0, 255.0, 0.0)); // red
+							ss << std::setfill('0') << std::setw(2) << std::hex << int(map(connection.weight, 0.5, 1.0, 255.0 / 2.0, 255.0)); // green
 							ss << "00"; // blue
 						}
 						else {
 							ss << "FF", // red
-							ss << std::hex << int(map(connection.weight, 0.0, 0.5, 0.0, 255.0 / 2.0)); // green
+							ss << std::setfill('0') << std::setw(2) << std::hex << int(map(connection.weight, 0.0, 0.5, 0.0, 255.0 / 2.0)); // green
 							ss << "00"; // blue
 						}
 						SVG::line(
@@ -65,7 +67,45 @@ void Parameterization::isolines_svg(std::ostream& os, const Input& input) {
 
 void Parameterization::parameterize_cluster(Cluster* cluster) {
 	cluster->xsecs = orthogonal_xsecs(*cluster);
-	params_from_xsecs(cluster, true, nullptr);
+	for (int it = 1; it < 10; ++it) {
+		std::vector<std::vector<double>> prev_u;
+		for (auto& stroke : cluster->strokes) {
+			prev_u.push_back(stroke.u);
+		}
+		params_from_xsecs(cluster, it == 1, nullptr);
+
+		bool ok = true;
+		for (size_t stroke = 0; ok && stroke < prev_u.size(); ++stroke) {
+			for (size_t i = 0; ok && i < prev_u[stroke].size(); ++i) {
+				double diff = std::abs(prev_u[stroke][i] - cluster->strokes[stroke].u[i]);
+				if (i == prev_u[stroke].size() - 1) {
+					ok = diff * diff < 0.5 * 0.5 * glm::distance2(cluster->strokes[stroke].points[i - 1], cluster->strokes[stroke].points[i]);
+				}
+				else {
+					ok = diff * diff < 0.5 * 0.5 * glm::distance2(cluster->strokes[stroke].points[i], cluster->strokes[stroke].points[i + 1]);
+				}
+			}
+		}
+
+		if (ok) {
+			break;
+		}
+		else {
+			double total_len = cluster->max_u();
+			for (auto& xsec : cluster->xsecs) {
+				auto& get_u = [&](size_t idx) -> double {
+					auto& pt = xsec.points[idx];
+					double mix = pt.i - std::floor(pt.i);
+					return (1. - mix) * cluster->strokes[pt.stroke_idx].u[std::floor(pt.i)] +
+						mix * cluster->strokes[pt.stroke_idx].u[std::ceil(pt.i)];
+				};
+				for (auto& connection : xsec.connections) {
+					double diff = get_u(connection.a_idx) - get_u(connection.b_idx);
+					connection.weight = gaussian(diff, total_len / 30., 0.);
+				}
+			}
+		}
+	}
 }
 
 GRBLinExpr l1_norm(GRBModel* model, const std::vector<GRBLinExpr>& x) {
@@ -203,45 +243,37 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 		objective = l2_norm_sq(&model, velocity_terms) + l2_norm_sq(&model, alignment_terms);
 	}
 
-	try {
-		model.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
-		model.set(GRB_IntParam_DualReductions, 0);
-		model.setObjective(objective, GRB_MINIMIZE);
-		model.optimize();
+	model.setObjective(objective, GRB_MINIMIZE);
 
-		double min_u = std::numeric_limits<double>::infinity();
-		for (size_t stroke_idx = 0; stroke_idx < cluster->strokes.size(); ++stroke_idx) {
-			auto& stroke = cluster->strokes[stroke_idx];
-			for (size_t i = 0; i < stroke.points.size(); ++i) {
-				stroke.u[i] = param_vars[stroke_idx][i].get(GRB_DoubleAttr_X);
-				min_u = std::min(min_u, stroke.u[i]);
-			}
-		}
-		for (auto& stroke : cluster->strokes) {
-			for (size_t i = 0; i < stroke.u.size(); ++i) {
-				stroke.u[i] -= min_u;
-			}
-		}
+	try {
+		model.set(GRB_DoubleParam_FeasibilityTol, 1e-2);
+		model.optimize();
 	}
 	catch (GRBException e) {
-		model.computeIIS();
-		std::cout << "\nThe following constraint(s) "
-			<< "cannot be satisfied:" << std::endl;
-		GRBConstr* c = model.getConstrs();
-		for (int i = 0; i < model.get(GRB_IntAttr_NumConstrs); ++i)
-		{
-			if (c[i].get(GRB_IntAttr_IISConstr) == 1)
-			{
-				std::cout << c[i].get(GRB_StringAttr_ConstrName) << std::endl;
-			}
+		try {
+			//model.set(GRB_IntParam_DualReductions, 0);
+			model.set(GRB_IntParam_BarHomogeneous, 1);
+			model.optimize();
 		}
-		std::cout << "Done" << std::endl;
+		catch (GRBException e2) {
+			std::cout << "Error code = " << e2.getErrorCode() << std::endl;
+			std::cout << e2.getMessage() << std::endl;
+			throw e2;
+		}
+	}
 
-		model.write("D:\\model.lp");
-
-		std::cout << "Error code = " << e.getErrorCode() << std::endl;
-		std::cout << e.getMessage() << std::endl;
-		throw e;
+	double min_u = std::numeric_limits<double>::infinity();
+	for (size_t stroke_idx = 0; stroke_idx < cluster->strokes.size(); ++stroke_idx) {
+		auto& stroke = cluster->strokes[stroke_idx];
+		for (size_t i = 0; i < stroke.points.size(); ++i) {
+			stroke.u[i] = param_vars[stroke_idx][i].get(GRB_DoubleAttr_X);
+			min_u = std::min(min_u, stroke.u[i]);
+		}
+	}
+	for (auto& stroke : cluster->strokes) {
+		for (size_t i = 0; i < stroke.u.size(); ++i) {
+			stroke.u[i] -= min_u;
+		}
 	}
 }
 
