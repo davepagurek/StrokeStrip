@@ -56,7 +56,7 @@ struct Input {
 	double height;
 	std::map<int, Cluster> clusters;
 
-	void param_svg(std::ostream& os) const;
+	void param_svg(std::ostream& os, bool rainbow = false) const;
 	void orientation_svg(std::ostream& os, std::function<void(std::ostream&)> cb = [](std::ostream&) { }) const;
 	void cluster_svg(std::ostream& os, std::function<void(std::ostream&)> cb = [](std::ostream&) {}) const;
 };

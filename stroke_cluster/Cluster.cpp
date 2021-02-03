@@ -84,7 +84,7 @@ glm::dvec2 midpoint(const std::vector<glm::dvec2>& points) {
 	return points[points.size() / 2];
 }
 
-void Input::param_svg(std::ostream& os) const {
+void Input::param_svg(std::ostream& os, bool rainbow) const {
 	double padding = thickness;
 	double w = width * thickness + 2 * padding;
 	double h = height * thickness + 2 * padding;
@@ -103,12 +103,19 @@ void Input::param_svg(std::ostream& os) const {
 			}
 			for (size_t i = 0; i < stroke.points.size() - 1; ++i) {
 				std::stringstream ss;
-				ss << "#";
-				ss << std::setfill('0') << std::setw(2);
-				ss << std::hex << int(stroke.u[i]/max_u * 255); // red
-				ss << "00"; // green
-				ss << std::setfill('0') << std::setw(2);
-				ss << std::hex << int(255 - stroke.u[i]/max_u * 255); // blue
+				if (rainbow) {
+					ss << "hsl(";
+					ss << int(stroke.u[i] / max_u * 360) << ", ";
+					ss << "90%, 50%)";
+				}
+				else {
+					ss << "#";
+					ss << std::setfill('0') << std::setw(2);
+					ss << std::hex << int(stroke.u[i] / max_u * 255); // red
+					ss << "00"; // green
+					ss << std::setfill('0') << std::setw(2);
+					ss << std::hex << int(255 - stroke.u[i] / max_u * 255); // blue
+				}
 				SVG::line(os, scaled[i].x, scaled[i].y, scaled[i + 1].x, scaled[i + 1].y, thickness, ss.str());
 			}
 		}

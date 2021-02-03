@@ -119,9 +119,9 @@ int main(int argc, char** argv) {
 	{
 		std::string final_output_name = scap_filename;
 		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
-		final_output_name += "_rb.svg";
+		final_output_name += "_rainbow.svg";
 		std::ofstream param_svg(final_output_name);
-		input.param_svg(param_svg);
+		input.param_svg(param_svg, true);
 	}
 
 	{
