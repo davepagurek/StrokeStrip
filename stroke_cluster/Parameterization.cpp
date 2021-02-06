@@ -169,41 +169,6 @@ void Parameterization::parameterize_cluster(Cluster* cluster) {
 	cluster->xsecs = xsecs_from_params(*cluster);
 }
 
-GRBLinExpr l1_norm(GRBModel* model, const std::vector<GRBLinExpr>& x) {
-	// min ||x||_1
-	//
-	// ...is equivalent to:
-	//
-	// min t
-	// s.t.
-	// x_i <= y_i,
-	// -x_i <= y_i,
-	// \sum_i y_i = t
-
-	GRBLinExpr sum_y = 0.0;
-	auto t = model->addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
-	std::vector<GRBVar> y;
-	y.reserve(x.size());
-	for (auto& term : x) {
-		y.push_back(model->addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS));
-		sum_y += y.back();
-		model->addConstr(term <= y.back());
-		model->addConstr(-term <= y.back());
-	}
-	model->addConstr(sum_y == t);
-
-	return t;
-}
-
-GRBQuadExpr l2_norm_sq(GRBModel* model, const std::vector<GRBLinExpr>& x) {
-	GRBQuadExpr result = 0.0;
-	for (auto& term : x) {
-		result += term * term;
-	}
-
-	return result;
-}
-
 void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster::XSec* cut) {
 	GRBModel model(context.grb);
 
@@ -639,10 +604,10 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 	return xsec;
 }
 
-std::vector<Cluster::XSec> Parameterization::xsecs_from_params(const Cluster& cluster, bool nonlinear) {
-	const double RATE = 1;
+std::vector<Cluster::XSec> Parameterization::xsecs_from_params(const Cluster& cluster, double sample_rate, bool nonlinear) {
 	double max_u = cluster.max_u();
-	size_t num_xsecs = std::ceil(max_u / RATE);
+	size_t num_xsecs = std::ceil(max_u / sample_rate);
+	if (nonlinear) num_xsecs *= 3;
 
 	std::vector<Cluster::XSec> result;
 	result.reserve(num_xsecs);
@@ -653,7 +618,14 @@ std::vector<Cluster::XSec> Parameterization::xsecs_from_params(const Cluster& cl
 	}
 
 	for (size_t n = 0; n < num_xsecs; ++n) {
-		double u = double(n) / double(num_xsecs - 1) * max_u;
+		double t = double(n) / double(num_xsecs - 1);
+		double u;
+		if (nonlinear) {
+			u = poly_in_out(t, 2.25) * max_u;
+		}
+		else {
+			u = t * max_u;
+		}
 		auto xsec = xsec_at_u(cluster, u);
 		if (xsec.points.size() > 0) {
 			result.push_back(xsec);

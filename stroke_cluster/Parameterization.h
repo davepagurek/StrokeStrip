@@ -12,6 +12,8 @@ public:
 	void isolines_svg(std::ostream& os, const Input& input);
 	void debug_svg(std::ostream& os, const Input& input);
 
+	std::vector<Cluster::XSec> xsecs_from_params(const Cluster& cluster, double sample_rate = 1., bool nonlinear = false);
+
 private:
 	bool viz;
 
@@ -32,7 +34,6 @@ private:
 	void check_periodic(Cluster* cluster);
 
 	std::vector<Cluster::XSec> orthogonal_xsecs(const Cluster& cluster, double angle_tolerance = 0.0);
-	std::vector<Cluster::XSec> xsecs_from_params(const Cluster& cluster, bool nonlinear = false);
 	Cluster::XSec xsec_at_u(const Cluster& cluster, double u);
 	Cluster::XSec orthogonal_xsec_at(const Cluster& cluster, size_t stroke, double i);
 };

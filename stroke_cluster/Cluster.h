@@ -35,6 +35,7 @@ struct Cluster {
 
 		double distance_weight(size_t i) const;
 		glm::dvec2 avg_tangent() const;
+		glm::dvec2 avg_point() const;
 	};
 
 	std::vector<Stroke> strokes;

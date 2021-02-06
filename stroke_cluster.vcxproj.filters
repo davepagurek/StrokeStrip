@@ -126,6 +126,9 @@
     <ClCompile Include="stroke_cluster\Context.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="stroke_cluster\Fitting.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stroke_cluster\StrokeCutting.h">
@@ -1602,6 +1605,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="stroke_cluster\Context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stroke_cluster\Fitting.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

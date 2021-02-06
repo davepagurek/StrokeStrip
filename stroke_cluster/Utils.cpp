@@ -65,3 +65,48 @@ std::vector<Intersection> intersections(const std::vector<glm::dvec2>& polyline,
 double gaussian(double x, double sigma, double mu) {
 	return std::exp(-0.5 * std::pow((x - mu) / sigma, 2));
 }
+
+double poly_in_out(double t, double k) {
+	double t2 = 2 * t;
+	if (t2 <= 1) {
+		return std::pow(t2, k) / 2.;
+	}
+	else {
+		return (2. - std::pow(2. - t2, k)) / 2.;
+	}
+}
+
+GRBLinExpr l1_norm(GRBModel* model, const std::vector<GRBLinExpr>& x) {
+	// min ||x||_1
+	//
+	// ...is equivalent to:
+	//
+	// min t
+	// s.t.
+	// x_i <= y_i,
+	// -x_i <= y_i,
+	// \sum_i y_i = t
+
+	GRBLinExpr sum_y = 0.0;
+	auto t = model->addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+	std::vector<GRBVar> y;
+	y.reserve(x.size());
+	for (auto& term : x) {
+		y.push_back(model->addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS));
+		sum_y += y.back();
+		model->addConstr(term <= y.back());
+		model->addConstr(-term <= y.back());
+	}
+	model->addConstr(sum_y == t);
+
+	return t;
+}
+
+GRBQuadExpr l2_norm_sq(GRBModel* model, const std::vector<GRBLinExpr>& x) {
+	GRBQuadExpr result = 0.0;
+	for (auto& term : x) {
+		result += term * term;
+	}
+
+	return result;
+}

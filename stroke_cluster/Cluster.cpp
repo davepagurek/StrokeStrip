@@ -200,6 +200,15 @@ double Cluster::XSec::distance_weight(size_t i) const {
 	return weight;
 }
 
+glm::dvec2 Cluster::XSec::avg_point() const {
+	glm::dvec2 sum;
+	for (auto& p : points) {
+		sum += p.point;
+	}
+	if (points.size() > 0) sum /= double(points.size());
+	return sum;
+}
+
 glm::dvec2 Cluster::XSec::avg_tangent() const {
 	if (points.size() == 1) return points.front().tangent;
 

@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <glm/glm.hpp>
+#include <gurobi_c++.h>
 
 struct Intersection {
 	double i;
@@ -18,3 +19,8 @@ template<typename T> T map(T in, T in_from, T in_to, T out_from, T out_to) {
 }
 
 double gaussian(double x, double sigma, double mu);
+
+double poly_in_out(double t, double k);
+
+GRBLinExpr l1_norm(GRBModel* model, const std::vector<GRBLinExpr>& x);
+GRBQuadExpr l2_norm_sq(GRBModel* model, const std::vector<GRBLinExpr>& x);

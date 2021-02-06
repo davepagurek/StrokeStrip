@@ -11,6 +11,7 @@
 #include "StrokeOrientation.h"
 #include "Cluster.h"
 #include "Parameterization.h"
+#include "Fitting.h"
 
 void to_scap(std::string const &filename, Capture const &capture, int width, int height) {
 	std::ofstream scap_ofs(filename);
@@ -65,7 +66,7 @@ Input from_capture(Capture capture) {
 
 int main(int argc, char** argv) {
 	std::string scap_filename(argv[argc - 1]);
-	//std::string scap_filename = "D:\\strokestrip\\mno_SA_cluster.scap";
+	//std::string scap_filename = "D:\\strokestrip\\tests\\Giraffe02.scap";
 
 	Context context;
 
@@ -127,6 +128,19 @@ int main(int argc, char** argv) {
 			final_output_name += "_isolines.svg";
 			std::ofstream isolines_svg(final_output_name);
 			param.isolines_svg(isolines_svg, input);
+		}
+	}
+
+	// 4. Fitting
+	{
+		Fitting fitting(context);
+		auto fits = fitting.fit(input);
+		{
+			std::string final_output_name = scap_filename;
+			final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
+			final_output_name += "_fit.svg";
+			std::ofstream fit_svg(final_output_name);
+			fitting.fit_svg(fit_svg, input, fits);
 		}
 	}
 

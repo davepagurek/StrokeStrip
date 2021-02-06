@@ -163,6 +163,7 @@
     <ClCompile Include="include\glm\detail\glm.cpp" />
     <ClCompile Include="stroke_cluster\Cluster.cpp" />
     <ClCompile Include="stroke_cluster\Context.cpp" />
+    <ClCompile Include="stroke_cluster\Fitting.cpp" />
     <ClCompile Include="stroke_cluster\Main.cpp" />
     <ClCompile Include="stroke_cluster\Parameterization.cpp" />
     <ClCompile Include="stroke_cluster\StrokeCutting.cpp" />
@@ -653,6 +654,7 @@
     <ClInclude Include="stroke_cluster\Cluster.h" />
     <ClInclude Include="stroke_cluster\Context.h" />
     <ClInclude Include="stroke_cluster\CorrelationClustering.h" />
+    <ClInclude Include="stroke_cluster\Fitting.h" />
     <ClInclude Include="stroke_cluster\getopt.h" />
     <ClInclude Include="stroke_cluster\Parameterization.h" />
     <ClInclude Include="stroke_cluster\Polyline2D.h" />
