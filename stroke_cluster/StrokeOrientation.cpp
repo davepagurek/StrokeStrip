@@ -11,10 +11,7 @@
 
 const int MAX_VIOLATIONS = 20;
 
-StrokeOrientation::StrokeOrientation(bool viz): grb(true), viz(viz) {
-	grb.set(GRB_IntParam_LogToConsole, 0);
-	grb.start();
-}
+StrokeOrientation::StrokeOrientation(const Context& context): context(context) {}
 
 void StrokeOrientation::orientation_debug(std::ostream& os, const Input& input) {
 	input.orientation_svg(os, [&](std::ostream& os) {
@@ -56,7 +53,7 @@ void StrokeOrientation::flip_strokes(Input* input) {
 }
 
 std::vector<int> StrokeOrientation::orient_cluster_strokes(const Cluster& cluster) {
-	GRBModel model(grb);
+	GRBModel model(context.grb);
 	std::vector<GRBVar> vars;
 	vars.reserve(cluster.strokes.size());
 	for (size_t i = 0; i < cluster.strokes.size(); ++i) {
@@ -69,7 +66,7 @@ std::vector<int> StrokeOrientation::orient_cluster_strokes(const Cluster& cluste
 			auto info = orient_stroke_pair(cluster.strokes[i], cluster.strokes[j]);
 			objective += info.weight * info.orientation * (vars[i] - vars[j]) * (vars[i] - vars[j]);
 
-			if (viz) {
+			if (context.debug_viz) {
 				std::string color = std::string(info.orientation == 1 ? "rgba(0,255,0," : "rgba(255,0,0,") + std::to_string(std::min(1.0, info.weight * 10)) + std::string(")");
 				add_debug_line({ midpoint(cluster.strokes[i].points), midpoint(cluster.strokes[j].points), color });
 			}
@@ -217,7 +214,7 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 			result.weight *= len_ratio;
 		}
 
-		if (viz) {
+		if (context.debug_viz) {
 			for (auto& pair : policy_result.violations) {
 				add_debug_line({ pair.first, pair.second, "rgba(255,0,255,0.25)" });
 			}
@@ -482,7 +479,7 @@ void StrokeOrientation::fill_overlaps(const Cluster::Stroke& from, const Cluster
 		}
 	}
 
-	if (false && viz) {
+	if (false && context.debug_viz) {
 		for (size_t i = 0; i < overlaps.size(); i++) {
 			if (overlaps[i] != -1) {
 				add_debug_line({ from.points[i], to.points[overlaps[i]], "rgba(100,100,255,0.5)" });

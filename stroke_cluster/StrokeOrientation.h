@@ -1,23 +1,22 @@
 #pragma once
 
-#include <gurobi_c++.h>
 #include <vector>
 #include <map>
 #include <ostream>
 #include <mutex>
 
+#include "Context.h"
 #include "Cluster.h"
 
 class StrokeOrientation {
 public:
-	StrokeOrientation(bool viz = false);
+	StrokeOrientation(const Context& context);
 	void orient_strokes(const Input& input);
 	void flip_strokes(Input* input);
 	void orientation_debug(std::ostream& os, const Input& input);
 
 private:
-	GRBEnv grb;
-	bool viz;
+	const Context& context;
 	std::map<int, std::vector<int>> orientations;
 
 	std::mutex debug_lock;

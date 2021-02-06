@@ -1,13 +1,13 @@
 #pragma once
-#include <gurobi_c++.h>
 #include <ostream>
 #include <mutex>
 
 #include "Cluster.h"
+#include "Context.h"
 
 class Parameterization {
 public:
-	Parameterization(bool viz);
+	Parameterization(const Context& context);
 	void parameterize(Input* input);
 	void isolines_svg(std::ostream& os, const Input& input);
 	void debug_svg(std::ostream& os, const Input& input);
@@ -15,8 +15,7 @@ public:
 private:
 	bool viz;
 
-	GRBEnv grb;
-	std::mutex grb_lock;
+	const Context& context;
 	std::mutex viz_lock;
 
 	struct DebugLine {

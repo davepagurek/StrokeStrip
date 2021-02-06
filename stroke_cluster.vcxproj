@@ -162,6 +162,7 @@
     <ClCompile Include="include\cornucopia\TwoCurveCombine.cpp" />
     <ClCompile Include="include\glm\detail\glm.cpp" />
     <ClCompile Include="stroke_cluster\Cluster.cpp" />
+    <ClCompile Include="stroke_cluster\Context.cpp" />
     <ClCompile Include="stroke_cluster\Main.cpp" />
     <ClCompile Include="stroke_cluster\Parameterization.cpp" />
     <ClCompile Include="stroke_cluster\StrokeCutting.cpp" />
@@ -650,6 +651,7 @@
     <ClInclude Include="include\nlopt\nlopt.hpp" />
     <ClInclude Include="stroke_cluster\ClosedGroupDetection.h" />
     <ClInclude Include="stroke_cluster\Cluster.h" />
+    <ClInclude Include="stroke_cluster\Context.h" />
     <ClInclude Include="stroke_cluster\CorrelationClustering.h" />
     <ClInclude Include="stroke_cluster\getopt.h" />
     <ClInclude Include="stroke_cluster\Parameterization.h" />

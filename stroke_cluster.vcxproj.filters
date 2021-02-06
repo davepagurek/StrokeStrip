@@ -123,6 +123,9 @@
     <ClCompile Include="stroke_cluster\Parameterization.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="stroke_cluster\Context.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stroke_cluster\StrokeCutting.h">
@@ -1596,6 +1599,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="stroke_cluster\Parameterization.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stroke_cluster\Context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

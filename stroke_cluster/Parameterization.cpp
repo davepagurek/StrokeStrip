@@ -13,10 +13,7 @@
 #include "Utils.h"
 #include "SvgUtils.h"
 
-Parameterization::Parameterization(bool viz) : viz(viz), grb(true) {
-	grb.set(GRB_IntParam_LogToConsole, 0);
-	grb.start();
-}
+Parameterization::Parameterization(const Context& context): context(context) {}
 
 void Parameterization::parameterize(Input* input) {
 	std::map<int, std::future<void>> futures;
@@ -208,7 +205,7 @@ GRBQuadExpr l2_norm_sq(GRBModel* model, const std::vector<GRBLinExpr>& x) {
 }
 
 void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster::XSec* cut) {
-	GRBModel model(grb);
+	GRBModel model(context.grb);
 
 	std::vector<std::vector<GRBVar>> param_vars;
 	for (auto& stroke : cluster->strokes) {
@@ -358,30 +355,7 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 		throw e;
 	}
 
-	try {
-		std::lock_guard<std::mutex> lock(grb_lock);
-		//model.set(GRB_DoubleParam_FeasibilityTol, 1e-2);
-		model.optimize();
-	}
-	catch (GRBException e) {
-		try {
-			std::lock_guard<std::mutex> lock(grb_lock);
-			//model.set(GRB_IntParam_DualReductions, 0);
-			model.set(GRB_IntParam_BarHomogeneous, 1);
-			model.optimize();
-		}
-		catch (GRBException e2) {
-			std::cout << "Error code = " << e2.getErrorCode() << std::endl;
-			std::cout << e2.getMessage() << std::endl;
-			throw e2;
-		}
-	}
-	if (model.get(GRB_IntAttr_Status) == GRB_NUMERIC) {
-		std::lock_guard<std::mutex> lock(grb_lock);
-		//model.set(GRB_IntParam_DualReductions, 0);
-		model.set(GRB_IntParam_BarHomogeneous, 1);
-		model.optimize();
-	}
+	context.optimize_model(&model);
 
 	double min_u = std::numeric_limits<double>::infinity();
 	for (size_t stroke_idx = 0; stroke_idx < cluster->strokes.size(); ++stroke_idx) {
@@ -1053,7 +1027,7 @@ void Parameterization::check_periodic(Cluster* cluster) {
 				if (jumps == 0 && edge.xsec_idx != -1) continue;
 
 				if (is_close(*edge.to, to)) {
-					if (viz) {
+					if (context.debug_viz) {
 						add_debug_line({
 							cluster->strokes[n->stroke_idx].points[n->i],
 							cluster->strokes[edge.to->stroke_idx].points[edge.to->i],
@@ -1065,7 +1039,7 @@ void Parameterization::check_periodic(Cluster* cluster) {
 				else {
 					auto res = visit(edge.to, jumps - (edge.xsec_idx != -1 ? 1 : 0));
 					if (!res.empty()) {
-						if (viz) {
+						if (context.debug_viz) {
 							add_debug_line({
 								cluster->strokes[n->stroke_idx].points[n->i],
 								cluster->strokes[edge.to->stroke_idx].points[edge.to->i],

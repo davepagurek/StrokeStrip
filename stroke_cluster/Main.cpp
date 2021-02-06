@@ -65,7 +65,9 @@ Input from_capture(Capture capture) {
 
 int main(int argc, char** argv) {
 	std::string scap_filename(argv[argc - 1]);
-	//std::string scap_filename = "D:\\strokestrip\\cmd_SA_cluster.scap";
+	//std::string scap_filename = "D:\\strokestrip\\mno_SA_cluster.scap";
+
+	Context context;
 
 	Input input;
 
@@ -96,10 +98,9 @@ int main(int argc, char** argv) {
 
 	// 2. Orientation
 	{
-		bool debug_orientation = true;
-		StrokeOrientation orientation(debug_orientation);
+		StrokeOrientation orientation(context);
 		orientation.orient_strokes(input);
-		if (debug_orientation) {
+		if (context.debug_viz) {
 			std::string final_output_name = scap_filename;
 			final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
 			final_output_name += "_orientation_debug.svg";
@@ -111,10 +112,9 @@ int main(int argc, char** argv) {
 
 	// 3. Parameterization
 	{
-		bool debug_parameterization = true;
-		Parameterization param(debug_parameterization);
+		Parameterization param(context);
 		param.parameterize(&input);
-		if (debug_parameterization) {
+		if (context.debug_viz) {
 			std::string final_output_name = scap_filename;
 			final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
 			final_output_name += "_param_debug.svg";
