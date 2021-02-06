@@ -223,6 +223,7 @@ glm::dvec2 Cluster::XSec::avg_tangent() const {
 		else {
 			weight += dists[i + 1];
 		}
+		weight += 2.0; // Regularize to avoid zeros
 
 		sum += weight * points[i].tangent;
 	}

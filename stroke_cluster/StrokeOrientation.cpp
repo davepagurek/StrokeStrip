@@ -112,7 +112,7 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 			}
 		}
 	}
-	bool endpoint = endpoint_dist < 1e-4;
+	bool endpoint = endpoint_dist < 1e-1;
 
 	bool has_overlap = std::any_of(overlaps_a.begin(), overlaps_a.end(), [](int i) { return i != -1; }) ||
 		std::any_of(overlaps_b.begin(), overlaps_b.end(), [](int i) { return i != -1; });
@@ -129,10 +129,10 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 		else if (std::isinf(policy_result_rev.shortest_cut)) {
 			policy = -1;
 		}
-		else if (policy_result_fwd.violations.empty() != policy_result_rev.violations.empty()) {
-			policy = policy_result_fwd.violations.empty() ? 1 : -1;
+		else if (policy_result_fwd.violations.size() < MAX_VIOLATIONS != policy_result_rev.violations.size() < MAX_VIOLATIONS) {
+			policy = policy_result_fwd.violations.size() < MAX_VIOLATIONS ? 1 : -1;
 		}
-		else if (policy_result_fwd.violations.empty() && policy_result_rev.violations.empty()) {
+		else if (policy_result_fwd.violations.size() < MAX_VIOLATIONS && policy_result_rev.violations.size() < MAX_VIOLATIONS) {
 			policy = policy_result_fwd.shortest_cut > policy_result_rev.shortest_cut ? 1 : -1;
 		}
 		else {
@@ -227,7 +227,7 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 	double min_dist = 0;
 	if (!policy_result.connection_dists.empty()) {
 		size_t num_dists = policy_result.connection_dists.size();
-		int off = 0.6 * num_dists;
+		int off = 0.2 * (num_dists-1);
 		std::nth_element(policy_result.connection_dists.begin(), policy_result.connection_dists.begin() + off, policy_result.connection_dists.end());
 		result.weight /= 1. + (0.5 * 0.5 * policy_result.connection_dists[off] * policy_result.connection_dists[off]);
 		//std::cout << "Dist: " << policy_result.connection_dists[off] << "; weight: " << result.weight << std::endl;
@@ -294,6 +294,15 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 				result.connection_dists.push_back(glm::distance(from.points[i], to.points[overlaps[i]]));
 			}
 			else {
+				// See if we're connected from the other side
+				auto it = std::find(other_overlaps.begin(), other_overlaps.end(), i);
+				if (it != other_overlaps.end()) {
+					size_t j = it - other_overlaps.begin();
+					result.connection_angles.push_back(std::acos(policy * glm::dot(tangent(from.points, i), tangent(to.points, j))));
+					result.connection_dists.push_back(glm::distance(from.points[i], to.points[j]));
+					continue;
+				}
+
 				// Otherwise, find the isoline this point is on
 
 				std::vector<Neighbour> neighbours;

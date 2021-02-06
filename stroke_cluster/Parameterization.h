@@ -1,6 +1,7 @@
 #pragma once
 #include <gurobi_c++.h>
 #include <ostream>
+#include <mutex>
 
 #include "Cluster.h"
 
@@ -9,14 +10,27 @@ public:
 	Parameterization(bool viz);
 	void parameterize(Input* input);
 	void isolines_svg(std::ostream& os, const Input& input);
+	void debug_svg(std::ostream& os, const Input& input);
 
 private:
 	bool viz;
 
 	GRBEnv grb;
+	std::mutex grb_lock;
+	std::mutex viz_lock;
+
+	struct DebugLine {
+		glm::dvec2 from;
+		glm::dvec2 to;
+		std::string color;
+	};
+	void add_debug_line(DebugLine line);
+	std::vector<DebugLine> debug_lines;
+
 	void parameterize_cluster(Cluster* cluster);
 	void params_from_xsecs(Cluster* cluster, bool initial = false, Cluster::XSec* cut = nullptr);
-	void ensure_connected(Cluster* cluster);
+	void ensure_connected(Cluster* cluster, Cluster::XSec* cut = nullptr);
+	void check_periodic(Cluster* cluster);
 
 	std::vector<Cluster::XSec> orthogonal_xsecs(const Cluster& cluster, double angle_tolerance = 0.0);
 	std::vector<Cluster::XSec> xsecs_from_params(const Cluster& cluster, bool nonlinear = false);

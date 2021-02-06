@@ -39,6 +39,7 @@ struct Cluster {
 
 	std::vector<Stroke> strokes;
 	std::vector<XSec> xsecs;
+	bool periodic = false;
 
 	double max_u() const;
 };

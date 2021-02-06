@@ -48,6 +48,7 @@ Input from_capture(Capture capture) {
 	input.height = (max_y - min_y) / capture.thickness;
 
 	for (auto& polyline : capture.sketchedPolylines) {
+		if (polyline.points.empty()) continue;
 		clusters[polyline.group_ind].strokes.emplace_back();
 		auto& stroke = clusters[polyline.group_ind].strokes.back();
 		stroke.points.reserve(polyline.points.size());
@@ -63,8 +64,8 @@ Input from_capture(Capture capture) {
 }
 
 int main(int argc, char** argv) {
-	//std::string scap_filename(argv[argc - 1]);
-	std::string scap_filename = "D:\\strokestrip\\mno_SA_cluster.scap";
+	std::string scap_filename(argv[argc - 1]);
+	//std::string scap_filename = "D:\\strokestrip\\cmd_SA_cluster.scap";
 
 	Input input;
 
@@ -95,25 +96,38 @@ int main(int argc, char** argv) {
 
 	// 2. Orientation
 	{
-		StrokeOrientation orientation(false);
+		bool debug_orientation = true;
+		StrokeOrientation orientation(debug_orientation);
 		orientation.orient_strokes(input);
-		/*std::string final_output_name = scap_filename;
-		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
-		final_output_name += "_orientation_debug.svg";
-		std::ofstream orientation_svg(final_output_name);
-		orientation.orientation_debug(orientation_svg, input);*/
+		if (debug_orientation) {
+			std::string final_output_name = scap_filename;
+			final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
+			final_output_name += "_orientation_debug.svg";
+			std::ofstream orientation_svg(final_output_name);
+			orientation.orientation_debug(orientation_svg, input);
+		}
 		orientation.flip_strokes(&input);
 	}
 
 	// 3. Parameterization
 	{
-		Parameterization param(true);
+		bool debug_parameterization = true;
+		Parameterization param(debug_parameterization);
 		param.parameterize(&input);
-		std::string final_output_name = scap_filename;
-		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
-		final_output_name += "_isolines.svg";
-		std::ofstream isolines_svg(final_output_name);
-		param.isolines_svg(isolines_svg, input);
+		if (debug_parameterization) {
+			std::string final_output_name = scap_filename;
+			final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
+			final_output_name += "_param_debug.svg";
+			std::ofstream debug_svg(final_output_name);
+			param.debug_svg(debug_svg, input);
+		}
+		{
+			std::string final_output_name = scap_filename;
+			final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
+			final_output_name += "_isolines.svg";
+			std::ofstream isolines_svg(final_output_name);
+			param.isolines_svg(isolines_svg, input);
+		}
 	}
 
 	{

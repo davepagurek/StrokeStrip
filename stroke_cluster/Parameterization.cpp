@@ -3,6 +3,7 @@
 #include <future>
 #include <sstream>
 #include <iomanip>
+#include <fstream>
 #include <cmath>
 #include <deque>
 #include <unordered_set>
@@ -13,12 +14,12 @@
 #include "SvgUtils.h"
 
 Parameterization::Parameterization(bool viz) : viz(viz), grb(true) {
-	//grb.set(GRB_IntParam_LogToConsole, 0);
+	grb.set(GRB_IntParam_LogToConsole, 0);
 	grb.start();
 }
 
 void Parameterization::parameterize(Input* input) {
-	/*std::map<int, std::future<void>> futures;
+	std::map<int, std::future<void>> futures;
 	for (auto& kv : input->clusters) {
 		futures[kv.first] = std::async(std::launch::async, [&]() -> void {
 			return parameterize_cluster(&kv.second);
@@ -26,10 +27,10 @@ void Parameterization::parameterize(Input* input) {
 	}
 	for (auto& kv : input->clusters) {
 		futures[kv.first].get();
-	}*/
-	for (auto& kv : input->clusters) {
-		parameterize_cluster(&kv.second);
 	}
+	/*for (auto& kv : input->clusters) {
+		parameterize_cluster(&kv.second);
+	}*/
 }
 
 void Parameterization::isolines_svg(std::ostream& os, const Input& input) {
@@ -66,9 +67,21 @@ void Parameterization::isolines_svg(std::ostream& os, const Input& input) {
 	});
 }
 
+void Parameterization::debug_svg(std::ostream& os, const Input& input) {
+	input.cluster_svg(os, [&](std::ostream& os) {
+		for (auto& line : debug_lines) {
+			SVG::line(os, line.from.x, line.from.y, line.to.x, line.to.y, 1.0, line.color);
+		}
+	});
+}
+
+void Parameterization::add_debug_line(Parameterization::DebugLine line) {
+	std::lock_guard<std::mutex> lock(viz_lock);
+	debug_lines.push_back(line);
+}
+
 void Parameterization::parameterize_cluster(Cluster* cluster) {
 	cluster->xsecs = orthogonal_xsecs(*cluster);
-	ensure_connected(cluster);
 	std::vector<std::vector<double>> prev_u;
 
 	auto& record_current_u = [&]() -> void {
@@ -96,6 +109,7 @@ void Parameterization::parameterize_cluster(Cluster* cluster) {
 
 	for (int it = 0; it < 5; ++it) {
 		record_current_u();
+		ensure_connected(cluster);
 		params_from_xsecs(cluster, it == 0, nullptr);
 
 		if (converged()) {
@@ -129,6 +143,33 @@ void Parameterization::parameterize_cluster(Cluster* cluster) {
 			break;
 		}
 	}
+
+	record_current_u();
+	check_periodic(cluster);
+	if (cluster->periodic) {
+		auto old_u = [&](size_t stroke, double i) {
+			double mix = i - std::floor(i);
+			return (1. - mix) * prev_u[stroke][std::floor(i)] + mix * prev_u[stroke][std::ceil(i)];
+		};
+		auto is_cut = [&](const Cluster::XSec& xsec) {
+			for (auto& conn : xsec.connections) {
+				if (std::abs(
+					old_u(xsec.points[conn.a_idx].stroke_idx, xsec.points[conn.a_idx].i) -
+					old_u(xsec.points[conn.b_idx].stroke_idx, xsec.points[conn.b_idx].i))
+				> 5.) {
+					return true;
+				}
+			}
+			return false;
+		};
+		auto cut_it = std::find_if(cluster->xsecs.begin(), cluster->xsecs.end(), is_cut);
+		if (cut_it != cluster->xsecs.end()) {
+			auto cut = *cut_it;
+			ensure_connected(cluster, &cut);
+			params_from_xsecs(cluster, false, &cut);
+		}
+	}
+	cluster->xsecs = xsecs_from_params(*cluster);
 }
 
 GRBLinExpr l1_norm(GRBModel* model, const std::vector<GRBLinExpr>& x) {
@@ -179,10 +220,33 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 		}
 	}
 
+	auto points_cross_cut = [&](size_t stroke, int a, int b) {
+		for (auto& pt : cut->points) {
+			if (pt.stroke_idx == stroke && std::ceil(pt.i) >= a && std::floor(pt.i) <= b) {
+				return true;
+			}
+		}
+		return false;
+	};
+
 	std::vector<GRBLinExpr> velocity_terms;
 	std::vector<GRBLinExpr> alignment_terms;
 	for (auto& xsec : cluster->xsecs) {
 		glm::dvec2 tangent = xsec.avg_tangent();
+
+		auto connection_crosses_cut = [&](const Cluster::XSecConnection conn) {
+			for (size_t idx : { conn.a_idx, conn.b_idx }) {
+				size_t stroke = xsec.points[idx].stroke_idx;
+				double i = xsec.points[idx].i;
+
+				for (auto& pt : cut->points) {
+					if (pt.stroke_idx == stroke && std::ceil(pt.i) >= std::ceil(i) && std::floor(pt.i) <= std::floor(i)) {
+						return true;
+					}
+				}
+			}
+			return false;
+		};
 
 		// 1. Add velocity term
 		{
@@ -193,13 +257,13 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 			for (size_t i = 0; i < xsec.points.size(); ++i) {
 				auto& point = xsec.points[i];
 				double weight = xsec.distance_weight(i) + 2.; // Regularize to avoid zero weights on very close strokes
-				total_weight += weight;
 				double coefficient = weight * glm::dot(point.tangent, tangent) / glm::length(point.to_next);
 				if (std::isnan(coefficient)) {
 					throw "coefficient NaN";
 				}
 				if (std::isinf(coefficient)) {
 					throw "coefficient inf";
+					continue;
 				}
 
 				int a = std::floor(point.i);
@@ -213,6 +277,10 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 						++b;
 					}
 				}
+
+				if (cut && points_cross_cut(point.stroke_idx, a, b)) continue;
+
+				total_weight += weight;
 				velocity_term += coefficient * (1 - mix) *
 					(param_vars[point.stroke_idx][b] - param_vars[point.stroke_idx][a]);
 
@@ -228,7 +296,7 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 		}
 
 		// 2. Add alignment terms
-		{
+		if (!cut || !std::any_of(xsec.connections.begin(), xsec.connections.end(), connection_crosses_cut)) {
 			for (auto& connection : xsec.connections) {
 				auto& pt_a = xsec.points[connection.a_idx];
 				auto& pt_b = xsec.points[connection.b_idx];
@@ -251,6 +319,8 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 	for (size_t stroke_idx = 0; stroke_idx < cluster->strokes.size(); ++stroke_idx) {
 		auto& stroke = cluster->strokes[stroke_idx];
 		for (size_t i = 0; i < stroke.points.size() - 1; ++i) {
+			if (cut && points_cross_cut(stroke_idx, i, i + 1)) continue;
+
 			model.addConstr(
 				param_vars[stroke_idx][i + 1] - param_vars[stroke_idx][i] >=
 					0.5 * glm::distance(stroke.points[i + 1], stroke.points[i]));
@@ -259,7 +329,14 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 
 	// 4. Boundary
 	//GRBQuadExpr boundary = param_vars[0][0] * param_vars[0][0];
-	model.addConstr(param_vars[0][0] == 0.0);
+	if (cut) {
+		for (auto& pt : cut->points) {
+			double dist_from_cut = glm::distance(pt.point, point(cluster->strokes[pt.stroke_idx].points, std::ceil(pt.i)));
+			model.addConstr(param_vars[pt.stroke_idx][std::ceil(pt.i)] == dist_from_cut);
+		}
+	} else {
+		model.addConstr(param_vars[0][0] == 0.0);
+	}
 
 	GRBQuadExpr objective;
 	if (initial) {
@@ -282,11 +359,13 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 	}
 
 	try {
+		std::lock_guard<std::mutex> lock(grb_lock);
 		//model.set(GRB_DoubleParam_FeasibilityTol, 1e-2);
 		model.optimize();
 	}
 	catch (GRBException e) {
 		try {
+			std::lock_guard<std::mutex> lock(grb_lock);
 			//model.set(GRB_IntParam_DualReductions, 0);
 			model.set(GRB_IntParam_BarHomogeneous, 1);
 			model.optimize();
@@ -296,6 +375,12 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 			std::cout << e2.getMessage() << std::endl;
 			throw e2;
 		}
+	}
+	if (model.get(GRB_IntAttr_Status) == GRB_NUMERIC) {
+		std::lock_guard<std::mutex> lock(grb_lock);
+		//model.set(GRB_IntParam_DualReductions, 0);
+		model.set(GRB_IntParam_BarHomogeneous, 1);
+		model.optimize();
 	}
 
 	double min_u = std::numeric_limits<double>::infinity();
@@ -525,12 +610,13 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 			if (stroke == j && std::abs(intersection.i - i) < 1e-1) continue;
 
 			glm::dvec2 to_next;
-			size_t floor_j = std::floor(j);
-			if (floor_j < cluster.strokes[j].points.size() - 1) {
-				to_next = (1 - (j - double(floor_j))) * (cluster.strokes[j].points[floor_j + 1] - cluster.strokes[j].points[floor_j]);
+			double other_i = intersection.i;
+			size_t floor_other_i = std::floor(intersection.i);
+			if (floor_other_i < cluster.strokes[j].points.size() - 1) {
+				to_next = (1 - (other_i - double(floor_other_i))) * (cluster.strokes[j].points[floor_other_i + 1] - cluster.strokes[j].points[floor_other_i]);
 			}
-			else if (j == std::floor(j)) {
-				to_next = cluster.strokes[j].points[floor_j] - cluster.strokes[j].points[floor_j - 1];
+			else if (floor_other_i == other_i) {
+				to_next = cluster.strokes[j].points[floor_other_i] - cluster.strokes[j].points[floor_other_i - 1];
 			}
 
 			potential_ints.push_back({
@@ -610,6 +696,9 @@ std::vector<Cluster::XSec> Parameterization::xsecs_from_params(const Cluster& cl
 		for (size_t i = 0; i < cluster.strokes[stroke_idx].u.size(); ++i) {
 			if (!sampled[stroke_idx][i]) {
 				auto xsec = xsec_at_u(cluster, cluster.strokes[stroke_idx].u[i]);
+				if (xsec.points.empty()) {
+					continue;
+				}
 				for (auto& pt : xsec.points) {
 					sampled[pt.stroke_idx][std::floor(pt.i)] = true;
 					sampled[pt.stroke_idx][std::ceil(pt.i)] = true;
@@ -624,53 +713,94 @@ std::vector<Cluster::XSec> Parameterization::xsecs_from_params(const Cluster& cl
 
 Cluster::XSec Parameterization::xsec_at_u(const Cluster& cluster, double u) {
 	Cluster::XSec xsec = { {}, {}, 0, u, false };
+	double period = cluster.max_u() + 1e-1;
 	for (size_t stroke_idx = 0; stroke_idx < cluster.strokes.size(); ++stroke_idx) {
 		auto& stroke = cluster.strokes[stroke_idx];
-		auto it_gt = std::lower_bound(stroke.u.begin(), stroke.u.end(), u);
-		auto it_le = it_gt;
-		if (it_gt == stroke.u.begin()) {
-			continue;
-		}
-		else if (it_gt != stroke.u.end() && *it_gt - u < 1e-6) {
-			++it_gt;
-		} else {
-			--it_le;
-		}
-		if (it_gt == stroke.u.end()) {
-			if (*it_le == u) {
-				it_gt = it_le;
+		auto from = stroke.u.begin();
+
+		// Periodic parameterizations are no longer monotinic; instead, they are composed of
+		// monotonic chunks. We want to iterate over each chunk individually.
+		auto find_to = [](std::vector<double>::const_iterator it, std::vector<double>::const_iterator end) {
+			do {
+				++it;
+			} while (it != end && *it > *(it - 1));
+			return it;
+		};
+
+		for (auto to = from; from != stroke.u.end(); from = to) {
+			to = find_to(from, stroke.u.end());
+
+			auto it_gt = std::lower_bound(from, to, u);
+			auto it_le = it_gt;
+			if (it_gt == from) {
+				// This will only be a problem if we're at the beginning of a stroke.
+				// Periodic strokes will be special-cased later.
+				if (it_gt == stroke.u.begin()) {
+					continue;
+				}
+				else {
+					--it_le;
+				}
+			}
+			else if (it_gt != to && *it_gt - u < 1e-6) {
+				++it_gt;
 			}
 			else {
+				--it_le;
+			}
+			if (it_gt == to) {
+				// This is only a problem if we're at the end of a stroke. Periodic
+				// strokes will be special-cased later.
+				if (to == stroke.u.end()) {
+					if (*it_le == u) {
+						it_gt = it_le;
+					}
+					else {
+						continue;
+					}
+				}
+			}
+
+			size_t a = (it_le - stroke.u.begin());
+			size_t b = (it_gt - stroke.u.begin());
+
+			double u_le = *it_le;
+			double u_gt = *it_gt;
+			if (u_gt < u_le) {
+				if (u_le > u) {
+					u_le -= period;
+				}
+				else {
+					u_gt += period;
+				}
+			}
+
+			double mix = 0;
+			if (u_gt != u_le) {
+				mix = (u - u_le) / (u_gt - u_le);
+			}
+			if (mix < 0 || mix > 1) {
 				continue;
 			}
-		}
+			double i = a + mix;
+			glm::dvec2 point = (1. - mix) * stroke.points[a] + mix * stroke.points[b];
 
-		size_t a = (it_le - stroke.u.begin());
-		size_t b = (it_gt - stroke.u.begin());
+			glm::dvec2 to_next;
+			if (it_gt != it_le) {
+				to_next = stroke.points[b] - point;
+			}
+			else {
+				to_next = stroke.points[b] - stroke.points[b - 1];
+			}
 
-		double mix = 0;
-		if (it_gt != it_le) {
-			mix = (u - *it_le) / (*it_gt - *it_le);
-			mix = std::max(0.0, mix);
+			xsec.points.push_back({
+				stroke_idx,
+				i,
+				point,
+				to_next,
+				tangent(stroke.points, i)
+			});
 		}
-		double i = a + mix;
-		glm::dvec2 point = (1. - mix) * stroke.points[a] + mix * stroke.points[b];
-
-		glm::dvec2 to_next;
-		if (it_gt != it_le) {
-			to_next = stroke.points[b] - point;
-		}
-		else {
-			to_next = stroke.points[b] - stroke.points[b - 1];
-		}
-
-		xsec.points.push_back({
-			stroke_idx,
-			i,
-			point,
-			to_next,
-			tangent(stroke.points, i)
-		});
 	}
 
 	for (size_t a = 0; a < xsec.points.size(); ++a) {
@@ -682,28 +812,105 @@ Cluster::XSec Parameterization::xsec_at_u(const Cluster& cluster, double u) {
 	return xsec;
 }
 
-void Parameterization::ensure_connected(Cluster* cluster) {
+void Parameterization::ensure_connected(Cluster* cluster, Cluster::XSec* cut) {
+	struct StrokeSegment {
+		size_t stroke_idx;
+		double begin;
+		double end;
+	};
+	std::unordered_map<size_t, std::vector<StrokeSegment>> segments;
+
+	auto connection_crosses_cut = [&](const Cluster::XSec& xsec) {
+		for (auto& conn : xsec.connections) {
+			for (size_t idx : { conn.a_idx, conn.b_idx }) {
+				size_t stroke = xsec.points[idx].stroke_idx;
+				double i = xsec.points[idx].i;
+
+				for (auto& pt : cut->points) {
+					if (pt.stroke_idx == stroke && std::ceil(pt.i) >= std::ceil(i) && std::floor(pt.i) <= std::floor(i)) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	};
+
+	for (size_t stroke_idx = 0; stroke_idx < cluster->strokes.size(); ++stroke_idx) {
+		std::vector<double> cuts;
+		if (cut) {
+			for (auto& pt : cut->points) {
+				if (pt.stroke_idx == stroke_idx) {
+					cuts.push_back(pt.i);
+				}
+			}
+		}
+		std::sort(cuts.begin(), cuts.end());
+		StrokeSegment segment{ stroke_idx, -1., 0.0 };
+		for (double cut_i : cuts) {
+			segment.end = cut_i;
+			if (std::min<int>(cluster->strokes[stroke_idx].points.size() - 1, std::floor(segment.end)) -
+				std::max<int>(0, std::ceil(segment.begin)) > 2) {
+				segments[stroke_idx].push_back(segment);
+			}
+			segment.begin = cut_i;
+		}
+		segment.end = cluster->strokes[stroke_idx].points.size();
+		if (std::min<int>(cluster->strokes[stroke_idx].points.size() - 1, std::floor(segment.end)) -
+			std::max<int>(0, std::ceil(segment.begin)) > 2) {
+			segments[stroke_idx].push_back(segment);
+		}
+	}
+
+	StrokeSegment* first_non_cut_segment = &segments[0][0];
+	/*for (size_t stroke_idx = 0; stroke_idx < cluster->strokes.size(); ++stroke_idx) {
+		if (segments[stroke_idx].size() == 1) {
+			first_non_cut_segment = &segments[stroke_idx][0];
+			break;
+		}
+	}*/
+
 	bool ok = false;
 	while (!ok) {
-		std::unordered_map<size_t, bool> connected;
+		std::unordered_map<StrokeSegment*, bool> connected;
+		for (auto& kv : segments) {
+			for (auto& seg : kv.second) {
+				connected[&seg] = false;
+			}
+		}
 
-		std::function<void(size_t)> visit = [&](size_t stroke) -> void {
-			if (connected[stroke]) return;
-			connected[stroke] = true;
+		std::function<void(StrokeSegment*)> visit = [&](StrokeSegment* seg) -> void {
+			if (connected[seg]) return;
+			connected[seg] = true;
 
 			for (auto& xsec : cluster->xsecs) {
 				for (auto& c : xsec.connections) {
-					bool connected = (xsec.points[c.a_idx].stroke_idx == stroke || xsec.points[c.b_idx].stroke_idx == stroke) &&
-						c.weight > 1e-4;
-					if (connected) {
-						size_t other_idx = xsec.points[c.a_idx].stroke_idx == stroke ?
-							xsec.points[c.b_idx].stroke_idx : xsec.points[c.a_idx].stroke_idx;
-						visit(other_idx);
+					if (c.weight < 1e-4) continue;
+					bool connected_a = xsec.points[c.a_idx].stroke_idx == seg->stroke_idx && xsec.points[c.a_idx].i > seg->begin && xsec.points[c.a_idx].i < seg->end;
+					bool connected_b = xsec.points[c.b_idx].stroke_idx == seg->stroke_idx && xsec.points[c.b_idx].i > seg->begin && xsec.points[c.b_idx].i < seg->end;
+
+					if (connected_a || connected_b) {
+						size_t other = connected_a ? c.b_idx : c.a_idx;
+						size_t other_stroke = xsec.points[other].stroke_idx;
+						double other_i = xsec.points[other].i;
+
+						auto it = std::find_if(
+							segments[other_stroke].begin(),
+							segments[other_stroke].end(),
+							[&](const StrokeSegment& s) { return s.begin <= other_i && s.end > other_i;  }
+						);
+						if (it != segments[other_stroke].end()) {
+							auto& other_seg = *it;
+							visit(&other_seg);
+						}
+						else {
+							std::cout << "Can't find it" << std::endl;
+						}
 					}
 				}
 			}
 		};
-		visit(0);
+		visit(first_non_cut_segment);
 
 		double closest_dist = std::numeric_limits<double>::infinity();
 		Cluster::XSec connector = { {}, {{0, 1, 1.0}}, 0, 0.0, true };
@@ -711,29 +918,40 @@ void Parameterization::ensure_connected(Cluster* cluster) {
 		for (auto& disconnected : connected) {
 			if (disconnected.second) continue;
 			ok = false;
-			size_t stroke_a = disconnected.first;
+			size_t stroke_a = disconnected.first->stroke_idx;
+			double min_i = disconnected.first->begin;
+			double max_i = disconnected.first->end;
 
 			for (auto& kv : connected) {
 				if (!kv.second) continue;
-				size_t stroke_b = kv.first;
+				size_t stroke_b = kv.first->stroke_idx;
+				double min_j = kv.first->begin;
+				double max_j = kv.first->end;
 
-				for (size_t ia : { size_t(0), size_t(cluster->strokes[stroke_a].points.size() - 1) }) {
-					for (size_t ib : { size_t(0), size_t(cluster->strokes[stroke_b].points.size() - 1) }) {
+				for (int ia : { std::max<int>(0, std::ceil(min_i)), std::min<int>(cluster->strokes[stroke_a].points.size() - 1, std::floor(max_i)) }) {
+					for (int ib : { std::max<int>(0, std::ceil(min_j)), std::min<int>(cluster->strokes[stroke_b].points.size() - 1, std::floor(max_j)) }) {
+
 						double dist = glm::distance2(cluster->strokes[stroke_a].points[ia], cluster->strokes[stroke_b].points[ib]);
 						if (dist < closest_dist) {
-							closest_dist = dist;
 							glm::dvec2 to_next_a;
-							if (ia == 0) to_next_a = cluster->strokes[stroke_a].points[ia + 1] - cluster->strokes[stroke_b].points[ia];
-							else to_next_a = cluster->strokes[stroke_a].points[ia] - cluster->strokes[stroke_b].points[ia - 1];
+							if (ia == 0) to_next_a = cluster->strokes[stroke_a].points[ia + 1] - cluster->strokes[stroke_a].points[ia];
+							else to_next_a = cluster->strokes[stroke_a].points[ia] - cluster->strokes[stroke_a].points[ia - 1];
 
 							glm::dvec2 to_next_b;
 							if (ib == 0) to_next_b = cluster->strokes[stroke_b].points[ib + 1] - cluster->strokes[stroke_b].points[ib];
 							else to_next_b = cluster->strokes[stroke_b].points[ib] - cluster->strokes[stroke_b].points[ib - 1];
 
-							connector.points = {
+							auto new_connector = connector;
+							new_connector.points = {
 								{ stroke_a, double(ia), cluster->strokes[stroke_a].points[ia], to_next_a, tangent(cluster->strokes[stroke_a].points, double(ia)) },
-								{ stroke_b, double(ib), cluster->strokes[stroke_b].points[ib], to_next_b, tangent(cluster->strokes[stroke_b].points, double(ia)) },
+								{ stroke_b, double(ib), cluster->strokes[stroke_b].points[ib], to_next_b, tangent(cluster->strokes[stroke_b].points, double(ib)) },
 							};
+							new_connector.u = 0.5 * (cluster->strokes[stroke_a].u[ia] + cluster->strokes[stroke_b].u[ib]);
+
+							if (!cut || !connection_crosses_cut(new_connector)) {
+								closest_dist = dist;
+								connector = new_connector;
+							}
 						}
 					}
 				}
@@ -741,7 +959,179 @@ void Parameterization::ensure_connected(Cluster* cluster) {
 		}
 
 		if (!ok) {
+			if (connector.points.size() == 0) {
+				break;
+			}
 			cluster->xsecs.push_back(connector);
 		}
 	}
+}
+
+void Parameterization::check_periodic(Cluster* cluster) {
+	std::vector<Cluster::XSec> ortho_xsecs = orthogonal_xsecs(*cluster, 0.05);
+
+	struct Node;
+
+	struct Edge {
+		Node* to;
+		int xsec_idx;
+	};
+
+	struct Node {
+		size_t stroke_idx;
+		int i;
+		std::vector<Edge> edges;
+	};
+
+	std::vector<std::vector<Node>> nodes;
+	nodes.reserve(cluster->strokes.size());
+	for (size_t stroke_idx = 0; stroke_idx < cluster->strokes.size(); ++stroke_idx) {
+		nodes.emplace_back(cluster->strokes[stroke_idx].u.size(), Node{ stroke_idx, 0, {} });
+		for (int i = 0; i < nodes[stroke_idx].size(); ++i) {
+			nodes[stroke_idx][i].i = i;
+
+			// Connections due to monotonicity
+			if (i < nodes[stroke_idx].size() - 1) {
+				nodes[stroke_idx][i].edges.push_back({ &nodes[stroke_idx][i + 1], -1 });
+			}
+		}
+	}
+	// Known isolines
+	for (int xsec_idx = 0; xsec_idx < cluster->xsecs.size(); xsec_idx += 3) {
+		auto& xsec = cluster->xsecs[xsec_idx];
+		for (auto& conn : xsec.connections) {
+			size_t sa = xsec.points[conn.a_idx].stroke_idx;
+			size_t sb = xsec.points[conn.b_idx].stroke_idx;
+			double raw_ia = xsec.points[conn.a_idx].i;
+			double raw_ib = xsec.points[conn.b_idx].i;
+			int ia = std::round(raw_ia);
+			int ib = std::round(raw_ib);
+			nodes[sa][ia].edges.push_back({ &nodes[sb][ib], -1 });
+			nodes[sb][ib].edges.push_back({ &nodes[sa][ia], -1 });
+		}
+	}
+	// Orthogonal jumps
+	for (int xsec_idx = 0; xsec_idx < ortho_xsecs.size(); ++xsec_idx) {
+		auto& xsec = ortho_xsecs[xsec_idx];
+		for (auto& conn : xsec.connections) {
+			size_t sa = xsec.points[conn.a_idx].stroke_idx;
+			size_t sb = xsec.points[conn.b_idx].stroke_idx;
+			double raw_ia = xsec.points[conn.a_idx].i;
+			double raw_ib = xsec.points[conn.b_idx].i;
+			int ia = std::round(raw_ia);
+			int ib = std::round(raw_ib);
+			nodes[sa][ia].edges.push_back({ &nodes[sb][ib], xsec_idx });
+			nodes[sb][ib].edges.push_back({ &nodes[sa][ia], xsec_idx });
+		}
+	}
+
+	auto is_close = [&](const Node& a, const Cluster::XSec& b) {
+		for (auto& p_b : b.points) {
+			if (a.stroke_idx == p_b.stroke_idx &&
+				std::abs(std::double_t(a.i) - p_b.i) < 5.0) {
+				return true;
+			}
+		}
+		return false;
+	};
+
+	auto& find_path = [&](const Node& from, const Cluster::XSec& to) -> std::vector<int> {
+		int allowed_jumps = 2;
+		std::unordered_map<int, std::vector<std::vector<bool>>> visited;
+		for (int jumped = 0; jumped <= allowed_jumps; ++jumped) {
+			visited[jumped].reserve(nodes.size());
+			for (auto& stroke_nodes : nodes) {
+				visited[jumped].emplace_back(stroke_nodes.size(), false);
+			}
+		}
+
+		std::function<std::vector<int>(const Node*, int)> visit = [&](const Node* n, int jumps) -> std::vector<int> {
+			if (visited[jumps][n->stroke_idx][n->i]) return {};
+			visited[jumps][n->stroke_idx][n->i] = true;
+
+			for (auto& edge : n->edges) {
+				if (jumps == 0 && edge.xsec_idx != -1) continue;
+
+				if (is_close(*edge.to, to)) {
+					if (viz) {
+						add_debug_line({
+							cluster->strokes[n->stroke_idx].points[n->i],
+							cluster->strokes[edge.to->stroke_idx].points[edge.to->i],
+							edge.xsec_idx == -1 ? "#000" : "#F0F"
+							});
+					}
+					return { edge.xsec_idx };
+				}
+				else {
+					auto res = visit(edge.to, jumps - (edge.xsec_idx != -1 ? 1 : 0));
+					if (!res.empty()) {
+						if (viz) {
+							add_debug_line({
+								cluster->strokes[n->stroke_idx].points[n->i],
+								cluster->strokes[edge.to->stroke_idx].points[edge.to->i],
+								edge.xsec_idx == -1 ? "#000" : "#F0F"
+								});
+						}
+						res.push_back(edge.xsec_idx);
+						return res;
+					}
+				}
+			}
+
+			return {};
+		};
+		
+		return visit(&from, allowed_jumps);
+	};
+
+	auto pair = std::minmax_element(cluster->xsecs.begin(), cluster->xsecs.end(), [](const Cluster::XSec& a, const Cluster::XSec& b) { return a.u < b.u; });
+	Cluster::XSec& from = *pair.second;
+	Cluster::XSec& to = *pair.first;
+
+	auto get_u = [&](const Cluster::XSecPoint& pt) {
+		double mix = pt.i - std::floor(pt.i);
+		return (1. - mix) * cluster->strokes[pt.stroke_idx].u[std::floor(pt.i)] + mix * cluster->strokes[pt.stroke_idx].u[std::ceil(pt.i)];
+	};
+
+	std::vector<double> period_samples;
+	for (auto& stroke_nodes : nodes) {
+		for (auto& node : stroke_nodes) {
+			if (is_close(node, from)) {
+				auto path = find_path(node, to);
+				if (!path.empty()) {
+					for (int xsec_idx : path) {
+						if (xsec_idx == -1) continue;
+						auto& step = ortho_xsecs[xsec_idx];
+						for (auto& conn : step.connections) {
+							double u_a = get_u(step.points[conn.a_idx]);
+							double u_b = get_u(step.points[conn.b_idx]);
+							double diff = std::abs(u_a - u_b);
+							if (diff > 5.) {
+								period_samples.push_back(diff);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Not periodic
+	if (period_samples.empty()) return;
+
+	cluster->periodic = true;
+
+	int off = 0.1 * (period_samples.size() - 1);
+	std::nth_element(period_samples.begin(), period_samples.begin() + off, period_samples.end());
+	double period = period_samples[off];
+
+	// Make all u values be \in [0, period)
+	for (auto& stroke : cluster->strokes) {
+		for (auto& u : stroke.u) {
+			while (u >= period) {
+				u -= period;
+			}
+		}
+	}
+	cluster->xsecs = xsecs_from_params(*cluster);
 }
