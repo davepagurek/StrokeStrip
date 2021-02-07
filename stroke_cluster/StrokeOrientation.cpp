@@ -9,7 +9,7 @@
 
 #include "SvgUtils.h"
 
-const int MAX_VIOLATIONS = 30;
+const int MAX_VIOLATIONS = 10;
 
 StrokeOrientation::StrokeOrientation(const Context& context): context(context) {}
 
@@ -219,9 +219,10 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 	double min_dist = 0;
 	if (!policy_result.connection_dists.empty()) {
 		size_t num_dists = policy_result.connection_dists.size();
-		int off = 0.025 * (num_dists - 1);
+		int off = 0.025 * num_dists;
 		std::nth_element(policy_result.connection_dists.begin(), policy_result.connection_dists.begin() + off, policy_result.connection_dists.end());
-		result.weight /= 1. + (3 * 3 * policy_result.connection_dists[off] * policy_result.connection_dists[off]);
+		double min_dist = 3 * policy_result.connection_dists[off];
+		result.weight /= 1. + min_dist * min_dist;
 		//std::cout << "Dist: " << policy_result.connection_dists[off] << "; weight: " << result.weight << std::endl;
 	}
 
