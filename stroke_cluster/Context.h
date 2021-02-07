@@ -8,4 +8,5 @@ struct Context {
 
 	GRBEnv grb;
 	bool debug_viz = false;
+	bool cut = false;
 };

@@ -25,23 +25,8 @@ void Fitting::fit_svg(std::ostream& os, const Input& input, const std::map<int, 
 	SVG::end(os);
 }
 
-std::map<int, std::vector<glm::dvec2>> Fitting::fit(const Input& input) {
-	std::map<int, std::vector<glm::dvec2>> fits;
-	std::map<int, std::future<std::vector<glm::dvec2>>> futures;
-	for (auto& kv : input.clusters) {
-		futures[kv.first] = std::async(std::launch::async, [&]() -> std::vector<glm::dvec2> {
-			return fit_cluster(kv.second);
-			});
-	}
-	for (auto& kv : input.clusters) {
-		fits[kv.first] = futures[kv.first].get();
-	}
-	return fits;
-	/*std::map<int, std::vector<glm::dvec2>> fits;
-	for (auto& kv : input.clusters) {
-		fits[kv.first] = fit_cluster(kv.second);
-	}
-	return fits;*/
+std::map<int, std::vector<glm::dvec2>> Fitting::fit(Input* input) {
+	return map_clusters<std::vector<glm::dvec2>>(*input, [&](Cluster& c) { return fit_cluster(c); });
 }
 
 std::vector<glm::dvec2> Fitting::fit_cluster(Cluster cluster) {

@@ -7,7 +7,7 @@
 
 struct Fitting {
 	Fitting(const Context& context);
-	std::map<int, std::vector<glm::dvec2>> fit(const Input& input);
+	std::map<int, std::vector<glm::dvec2>> fit(Input* input);
 	std::vector<glm::dvec2> fit_cluster(Cluster cluster);
 
 	void fit_svg(std::ostream& os, const Input& input, const std::map<int, std::vector<glm::dvec2>>& fits);

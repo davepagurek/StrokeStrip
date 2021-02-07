@@ -142,7 +142,7 @@ void Input::orientation_svg(std::ostream& os, std::function<void(std::ostream&)>
 			std::string color(colors[stroke_num % colors.size()]);
 			SVG::polyline(os, scaled, thickness, color);
 
-			for (size_t i = 5; i < stroke.points.size(); i += 5) {
+			for (size_t i = 2; i < stroke.points.size(); i += 5) {
 				glm::dvec2 origin = scaled[i];
 				glm::dvec2 next = origin + normal(tangent(scaled, i)) * 4. * thickness;
 				SVG::line(os, origin.x, origin.y, next.x, next.y, thickness, color);
@@ -232,7 +232,7 @@ glm::dvec2 Cluster::XSec::avg_tangent() const {
 		else {
 			weight += dists[i + 1];
 		}
-		weight += 2.0; // Regularize to avoid zeros
+		weight += 0.1; // Regularize to avoid zeros
 
 		sum += weight * points[i].tangent;
 	}

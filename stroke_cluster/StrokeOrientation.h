@@ -11,7 +11,7 @@
 class StrokeOrientation {
 public:
 	StrokeOrientation(const Context& context);
-	void orient_strokes(const Input& input);
+	void orient_strokes(Input* input);
 	void flip_strokes(Input* input);
 	void orientation_debug(std::ostream& os, const Input& input);
 

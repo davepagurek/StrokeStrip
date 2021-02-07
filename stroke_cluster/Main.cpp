@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <deque>
 
 #include "StrokeCutting.h"
 #include "StrokeOrientation.h"
@@ -27,15 +28,32 @@ Input from_capture(Capture capture) {
 	Input input;
 	auto& clusters = input.clusters;
 
-	input.thickness = capture.thickness;
 
 	double min_x = std::numeric_limits<double>::infinity();
 	double max_x = -std::numeric_limits<double>::infinity();
 	double min_y = std::numeric_limits<double>::infinity();
 	double max_y = -std::numeric_limits<double>::infinity();
+	for (auto& polyline : capture.sketchedPolylines) {
+		for (auto& point : polyline.points) {
+			min_x = std::min(min_x, point.first.x);
+			max_x = std::max(max_x, point.first.x);
+			min_y = std::min(min_y, point.first.y);
+			max_y = std::max(max_y, point.first.y);
+		}
+	}
+
+	input.thickness = capture.thickness;
+
+	double rate = 2.75;
+	/*double diagonal = std::hypot(max_x - min_x, max_y - min_y);
+	if (diagonal < 20) {
+		rate = 1;
+	}*/
 
 	for (auto& polyline : capture.sketchedPolylines) {
-		polyline.reparameterize(3 * capture.thickness);
+		polyline.reparameterize(std::min(
+			rate * capture.thickness,
+			polyline.totalLen() / 3));
 
 		for (auto& point : polyline.points) {
 			min_x = std::min(min_x, point.first.x);
@@ -65,10 +83,34 @@ Input from_capture(Capture capture) {
 }
 
 int main(int argc, char** argv) {
-	std::string scap_filename(argv[argc - 1]);
-	//std::string scap_filename = "D:\\strokestrip\\tests\\Giraffe02.scap";
+	/*if (argc < 2) {
+		std::cout << "Usage: " << argv[0] << " input.scap [args]" << std::endl;
+		std::cout << "\t-d, --debug: Write debug visuals" << std::endl;
+		std::cout << "\t-c, --cut:   Cut sharp turns before processing" << std::endl;
+		return -1;
+	}
+	std::string scap_filename(argv[1]);
 
 	Context context;
+
+	std::deque<std::string> args;
+	for (size_t i = 2; i < argc; ++i) args.push_back(argv[i]);
+
+	while (!args.empty()) {
+		std::string arg = args.front();
+		args.pop_front();
+
+		if (arg == "-d" || arg == "--debug") {
+			context.debug_viz = true;
+		}
+		else if (arg == "-c" || arg == "--cut") {
+			context.cut = true;
+		}
+	}*/
+
+	std::string scap_filename = "D:\\strokestrip\\tests\\ghi.scap";
+	Context context;
+	context.debug_viz = true;
 
 	Input input;
 
@@ -93,14 +135,16 @@ int main(int argc, char** argv) {
 			max_ind = std::max(max_ind, capture.getSketchedPolyline(i).stroke_ind);
 		}
 
-		preprocess_cluster(1, width, height, &capture);
+		if (context.cut) {
+			preprocess_cluster(1, width, height, &capture);
+		}
 		input = from_capture(capture);
 	}
 
 	// 2. Orientation
 	{
 		StrokeOrientation orientation(context);
-		orientation.orient_strokes(input);
+		orientation.orient_strokes(&input);
 		if (context.debug_viz) {
 			std::string final_output_name = scap_filename;
 			final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
@@ -134,7 +178,7 @@ int main(int argc, char** argv) {
 	// 4. Fitting
 	{
 		Fitting fitting(context);
-		auto fits = fitting.fit(input);
+		auto fits = fitting.fit(&input);
 		{
 			std::string final_output_name = scap_filename;
 			final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap

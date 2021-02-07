@@ -9,7 +9,7 @@
 
 #include "SvgUtils.h"
 
-const int MAX_VIOLATIONS = 20;
+const int MAX_VIOLATIONS = 30;
 
 StrokeOrientation::StrokeOrientation(const Context& context): context(context) {}
 
@@ -28,16 +28,8 @@ void StrokeOrientation::add_debug_line(DebugLine line) {
 	debug_lines.push_back(line);
 }
 
-void StrokeOrientation::orient_strokes(const Input& input) {
-	std::map<int, std::future<std::vector<int>>> futures;
-	for (auto& kv : input.clusters) {
-		futures[kv.first] = std::async(std::launch::async, [&]() -> std::vector<int> {
-			return orient_cluster_strokes(kv.second);
-		});
-	}
-	for (auto& kv : input.clusters) {
-		orientations[kv.first] = futures[kv.first].get();
-	}
+void StrokeOrientation::orient_strokes(Input* input) {
+	orientations = map_clusters<std::vector<int>>(*input, [&](Cluster& c) { return orient_cluster_strokes(c);  });
 }
 
 void StrokeOrientation::flip_strokes(Input* input) {
@@ -126,8 +118,8 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 		else if (std::isinf(policy_result_rev.shortest_cut)) {
 			policy = -1;
 		}
-		else if (policy_result_fwd.violations.size() < MAX_VIOLATIONS != policy_result_rev.violations.size() < MAX_VIOLATIONS) {
-			policy = policy_result_fwd.violations.size() < MAX_VIOLATIONS ? 1 : -1;
+		else if (policy_result_fwd.violations.empty() != policy_result_rev.violations.empty()) {
+			policy = policy_result_fwd.violations.empty() ? 1 : -1;
 		}
 		else if (policy_result_fwd.violations.size() < MAX_VIOLATIONS && policy_result_rev.violations.size() < MAX_VIOLATIONS) {
 			policy = policy_result_fwd.shortest_cut > policy_result_rev.shortest_cut ? 1 : -1;
@@ -137,6 +129,12 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 		}
 
 		policy_result = policy == 1 ? policy_result_fwd : policy_result_rev;
+
+		if (context.debug_viz) {
+			for (auto& pair : policy_result.violations) {
+				add_debug_line({ pair.first, pair.second, "rgba(255,0,255,0.25)" });
+			}
+		}
 	}
 
 	bool tiny_stroke = false;
@@ -213,20 +211,14 @@ StrokeOrientation::PairOrientation StrokeOrientation::orient_stroke_pair(const C
 			len_ratio = std::max(0.5, len_ratio);
 			result.weight *= len_ratio;
 		}
-
-		if (context.debug_viz) {
-			for (auto& pair : policy_result.violations) {
-				add_debug_line({ pair.first, pair.second, "rgba(255,0,255,0.25)" });
-			}
-		}
 	}
 
 	double min_dist = 0;
 	if (!policy_result.connection_dists.empty()) {
 		size_t num_dists = policy_result.connection_dists.size();
-		int off = 0.2 * (num_dists-1);
+		int off = 0.01 * (num_dists - 1);
 		std::nth_element(policy_result.connection_dists.begin(), policy_result.connection_dists.begin() + off, policy_result.connection_dists.end());
-		result.weight /= 1. + (0.5 * 0.5 * policy_result.connection_dists[off] * policy_result.connection_dists[off]);
+		result.weight /= 1. + (3 * 3 * policy_result.connection_dists[off] * policy_result.connection_dists[off]);
 		//std::cout << "Dist: " << policy_result.connection_dists[off] << "; weight: " << result.weight << std::endl;
 	}
 
@@ -284,11 +276,14 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 	};
 	auto check_violations = [&](const Cluster::Stroke& from, const Cluster::Stroke& to, const std::vector<int>& overlaps, const std::vector<int>& other_overlaps) {
 		size_t n = overlaps.size();
+		std::vector<std::pair<glm::dvec2, glm::dvec2>> curr_violations;
 		for (size_t i = 0; i < n; ++i) {
 			if (overlaps[i] != -1) {
 				// If we have an orthogonal connection, add its angle to the list
 				result.connection_angles.push_back(std::acos(policy * glm::dot(tangent(from.points, i), tangent(to.points, overlaps[i]))));
 				result.connection_dists.push_back(glm::distance(from.points[i], to.points[overlaps[i]]));
+				if (curr_violations.size() > result.violations.size()) result.violations = curr_violations;
+				curr_violations.clear();
 			}
 			else {
 				// See if we're connected from the other side
@@ -297,6 +292,8 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 					size_t j = it - other_overlaps.begin();
 					result.connection_angles.push_back(std::acos(policy * glm::dot(tangent(from.points, i), tangent(to.points, j))));
 					result.connection_dists.push_back(glm::distance(from.points[i], to.points[j]));
+					if (curr_violations.size() > result.violations.size()) result.violations = curr_violations;
+					curr_violations.clear();
 					continue;
 				}
 
@@ -309,7 +306,7 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 						neighbours.push_back({
 							other_i,
 							overlaps[other_i],
-							abs(int(i) - other_i),
+							std::abs(int(i) - other_i),
 							glm::distance2(from.points[other_i], to.points[overlaps[other_i]])
 						});
 						break;
@@ -322,7 +319,7 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 						neighbours.push_back({
 							other_i,
 							overlaps[other_i],
-							abs(int(i) - other_i),
+							std::abs(int(i) - other_i),
 							glm::distance2(from.points[other_i], to.points[overlaps[other_i]])
 						});
 						break;
@@ -334,10 +331,10 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 				int closest_j_right = -1;
 				for (int j = 0; j < other_overlaps.size(); ++j) {
 					if (other_overlaps[j] == -1) continue;
-					if (other_overlaps[j] < i && (closest_j_left == -1 || other_overlaps[j] > closest_j_left)) {
+					if (other_overlaps[j] < i && (closest_j_left == -1 || other_overlaps[j] > other_overlaps[closest_j_left])) {
 						closest_j_left = j;
 					}
-					if (other_overlaps[j] > i && (closest_j_right == -1 || other_overlaps[j] < closest_j_right)) {
+					if (other_overlaps[j] > i && (closest_j_right == -1 || other_overlaps[j] < other_overlaps[closest_j_right])) {
 						closest_j_right = j;
 					}
 				}
@@ -367,14 +364,14 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 						return a.xsec_len_sq < b.xsec_len_sq;
 					});
 				int dist = i - neighbour.i;
-				int j = neighbour.j + dist;
+				int j = neighbour.j + policy * dist;
 
 				// No isoline because we ran out of other curve
 				if (j < 0 || j >= to.points.size()) continue;
 
 				double dot = policy * glm::dot(tangent(from.points, i), tangent(to.points, j));
 				if (dot < 0) {
-					result.violations.push_back({ from.points[i], to.points[j] });
+					curr_violations.push_back({ from.points[i], to.points[j] });
 				}
 				else {
 					result.connection_angles.push_back(std::acos(dot));
@@ -382,6 +379,8 @@ StrokeOrientation::PolicyResult StrokeOrientation::evaluate_policy(
 				}
 			}
 		}
+		if (curr_violations.size() > result.violations.size()) result.violations = curr_violations;
+		curr_violations.clear();
 	};
 	check_violations(a, b, overlaps_a, overlaps_b);
 	check_violations(b, a, overlaps_b, overlaps_a);
@@ -469,7 +468,7 @@ void StrokeOrientation::fill_overlaps(const Cluster::Stroke& from, const Cluster
 
 		double dist = dist1;
 		int used_i = i;
-		if (vec2_ok && dist2 < dist1) {
+		if (!vec1_ok || (vec2_ok && dist2 < dist1)) {
 			used_i = k;
 			dist = dist2;
 		}
@@ -479,7 +478,7 @@ void StrokeOrientation::fill_overlaps(const Cluster::Stroke& from, const Cluster
 		}
 	}
 
-	if (false && context.debug_viz) {
+	if (context.debug_viz) {
 		for (size_t i = 0; i < overlaps.size(); i++) {
 			if (overlaps[i] != -1) {
 				add_debug_line({ from.points[i], to.points[overlaps[i]], "rgba(100,100,255,0.5)" });
