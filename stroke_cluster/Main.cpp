@@ -83,7 +83,7 @@ Input from_capture(Capture capture) {
 }
 
 int main(int argc, char** argv) {
-	/*if (argc < 2) {
+	if (argc < 2) {
 		std::cout << "Usage: " << argv[0] << " input.scap [args]" << std::endl;
 		std::cout << "\t-d, --debug: Write debug visuals" << std::endl;
 		std::cout << "\t-c, --cut:   Cut sharp turns before processing" << std::endl;
@@ -106,11 +106,11 @@ int main(int argc, char** argv) {
 		else if (arg == "-c" || arg == "--cut") {
 			context.cut = true;
 		}
-	}*/
+	}
 
-	std::string scap_filename = "D:\\strokestrip\\tests\\ghi.scap";
+	/*std::string scap_filename = "D:\\strokestrip\\tests\\Bunny02Fxd.scap";
 	Context context;
-	context.debug_viz = true;
+	context.debug_viz = true;*/
 
 	Input input;
 

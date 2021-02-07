@@ -16,7 +16,7 @@ private:
 	const Context& context;
 
 	const double K_WEIGHT = 1e3;
-	const double POS_WEIGHT = 1e-4;
+	const double POS_WEIGHT = 5e-5;
 	const double MIN_DIST = 1e-4;
 
 	struct Sample {
