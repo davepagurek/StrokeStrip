@@ -25,6 +25,8 @@ std::vector<Intersection> intersections(const std::vector<glm::dvec2>& polyline,
 		double y0b = polyline[s].y;
 		double y1b = polyline[s + 1].y;
 
+		bool other_vertical = std::abs(x0b - x0a) < 1e-4;
+
 		// Ignore if outside bbox
 		if (
 			std::min(x0b, x1b) > std::max(x0a, x1a) ||
@@ -35,8 +37,19 @@ std::vector<Intersection> intersections(const std::vector<glm::dvec2>& polyline,
 
 		double tb = 0;
 		if (vertical) {
-			tb = (x0a - x0b) / (x1b - x0b);
-			if (tb < 0 || tb > 1) return { -1, glm::dvec2() };
+			if (other_vertical) {
+				bool intersection = std::max(std::min(y0a, y1a), std::min(y0b, y1b)) < std::min(std::max(y0a, y1a), std::max(y0b, y1b));
+				if (intersection) {
+					tb = (std::max(std::min(y0a, y1a), std::min(y0b, y1b)) - y0b) / (y1b - y0b);
+				}
+				else {
+					return { -1, glm::dvec2() };
+				}
+			}
+			else {
+				tb = (x0a - x0b) / (x1b - x0b);
+				if (tb < 0 || tb > 1) return { -1, glm::dvec2() };
+			}
 
 		}
 		else {

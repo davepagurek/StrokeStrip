@@ -33,22 +33,10 @@ Input from_capture(Capture capture) {
 	double max_x = -std::numeric_limits<double>::infinity();
 	double min_y = std::numeric_limits<double>::infinity();
 	double max_y = -std::numeric_limits<double>::infinity();
-	for (auto& polyline : capture.sketchedPolylines) {
-		for (auto& point : polyline.points) {
-			min_x = std::min(min_x, point.first.x);
-			max_x = std::max(max_x, point.first.x);
-			min_y = std::min(min_y, point.first.y);
-			max_y = std::max(max_y, point.first.y);
-		}
-	}
 
 	input.thickness = capture.thickness;
 
 	double rate = 2.75;
-	/*double diagonal = std::hypot(max_x - min_x, max_y - min_y);
-	if (diagonal < 20) {
-		rate = 1;
-	}*/
 
 	for (auto& polyline : capture.sketchedPolylines) {
 		polyline.reparameterize(std::min(
@@ -72,7 +60,9 @@ Input from_capture(Capture capture) {
 		auto& stroke = clusters[polyline.group_ind].strokes.back();
 		stroke.points.reserve(polyline.points.size());
 		stroke.u.reserve(polyline.points.size());
-		for (auto& point : polyline.points) {
+		for (size_t i = 0; i < polyline.points.size(); ++i) {
+			auto& point = polyline.points[i];
+
 			// Recenter and normalize to stroke width
 			stroke.points.push_back((glm::dvec2(point.first.x, point.first.y) - center) / capture.thickness);
 			stroke.u.push_back(0);
@@ -108,7 +98,7 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	/*std::string scap_filename = "D:\\strokestrip\\tests\\Bunny02Fxd.scap";
+	/*std::string scap_filename = "D:\\strokestrip\\tests\\siggraph.scap";
 	Context context;
 	context.debug_viz = true;*/
 

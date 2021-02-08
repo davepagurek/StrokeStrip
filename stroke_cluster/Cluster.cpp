@@ -41,6 +41,16 @@ std::vector<std::string> colors = {
 	"#8C510A"
 };
 
+glm::dvec2 simple_discrete_tangent(const std::vector<glm::dvec2>& points, size_t i) {
+	glm::dvec2 result;
+	if (i > 0) {
+		result += glm::normalize(points[i] - points[i - 1]);
+	} else {
+		result += glm::normalize(points[i + 1] - points[i]);
+	}
+	return glm::normalize(result);
+}
+
 glm::dvec2 discrete_tangent(const std::vector<glm::dvec2>& points, size_t i) {
 	glm::dvec2 result;
 	if (i > 0) {
@@ -53,12 +63,21 @@ glm::dvec2 discrete_tangent(const std::vector<glm::dvec2>& points, size_t i) {
 }
 
 glm::dvec2 tangent(const std::vector<glm::dvec2>& points, double i) {
+	glm::dvec2 tangent;
 	size_t a = std::floor(i);
-	if (double(a) == i) return discrete_tangent(points, (size_t)i);
+	if (double(a) == i) {
+		tangent = discrete_tangent(points, (size_t)i);
+	}
+	else {
+		size_t b = std::ceil(i);
+		double mix = i - double(a);
+		tangent = glm::normalize((1 - mix) * discrete_tangent(points, a) + mix * discrete_tangent(points, b));
+	}
 
-	size_t b = std::ceil(i);
-	double mix = i - double(a);
-	return glm::normalize((1 - mix) * discrete_tangent(points, a) + mix * discrete_tangent(points, b));
+	if (!glm::any(glm::isnan(tangent))) {
+		return tangent;
+	}
+	return simple_discrete_tangent(points, (size_t)std::floor(i));
 }
 
 glm::dvec2 point(const std::vector<glm::dvec2>& points, double i) {

@@ -211,7 +211,7 @@ void Parameterization::params_from_xsecs(Cluster* cluster, bool initial, Cluster
 			double total_weight = 0.0;
 			for (size_t i = 0; i < xsec.points.size(); ++i) {
 				auto& point = xsec.points[i];
-				double weight = xsec.distance_weight(i) + 0.1; // Regularize to avoid zero weights on very close strokes
+				double weight = xsec.distance_weight(i) + 1; // Regularize to avoid zero weights on very close strokes
 				double coefficient = weight * glm::dot(point.tangent, tangent) / glm::length(point.to_next);
 				if (std::isnan(coefficient)) {
 					throw "coefficient NaN";
@@ -564,6 +564,9 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 				},
 				glm::dot(intersection.pt - origin, ortho)
 			});
+			if (glm::any(glm::isnan(potential_ints.back().point.tangent))) {
+				potential_ints.pop_back();
+			}
 		}
 	}
 
@@ -1085,7 +1088,7 @@ void Parameterization::check_periodic(Cluster* cluster) {
 
 	cluster->periodic = true;
 
-	int off = 0.1 * (period_samples.size() - 1);
+	int off = 0.2 * (period_samples.size() - 1);
 	std::nth_element(period_samples.begin(), period_samples.begin() + off, period_samples.end());
 	double period = period_samples[off];
 
