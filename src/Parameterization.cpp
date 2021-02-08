@@ -1,10 +1,12 @@
 #include "Parameterization.h"
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include <future>
 #include <sstream>
 #include <iomanip>
 #include <fstream>
-#include <cmath>
 #include <deque>
 #include <unordered_set>
 #include <unordered_map>

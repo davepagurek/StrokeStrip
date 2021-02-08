@@ -1,3 +1,6 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include "StrokeOrientation.h"
 #include "Utils.h"
 #include <vector>

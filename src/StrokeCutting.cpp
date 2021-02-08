@@ -1,3 +1,6 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include "StrokeCutting.h"
 
 #include "glm/glm.hpp"

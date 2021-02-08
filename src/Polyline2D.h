@@ -1,8 +1,10 @@
 #pragma once
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include <iostream>
 #include <vector>
-#include "math.h"
 #include <cstdint>
 #include <sstream>
 #include <regex>
