@@ -1,5 +1,5 @@
 # StrokeStrip
-<img src="https://raw.githubusercontent.com/davepagurek/StrokeStrip/main/img/overview.png?token=ABIRT47EUU4J26ZNKRPRGTDAFK2LG" />
+<img src="https://github.com/davepagurek/StrokeStrip/blob/main/img/overview.png?raw=true" />
 
 StrokeStrip jointly parameterizes clusters of strokes (a) that, together, represent strips following a single intended curve (b). We compute the parameterization of this strip (c) restricted to the domain of the input strokes (d), which we then use to produce the parameterized intended curve (d).
 
