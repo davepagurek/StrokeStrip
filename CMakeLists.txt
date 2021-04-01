@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.3)
 
 project(strokestrip C)
 
+# Set c++11
+# https://stackoverflow.com/questions/10851247/how-to-activate-c-11-in-cmake
+if (POLICY CMP0025)
+  cmake_policy(SET CMP0025 NEW)
+endif ()
+set (CMAKE_CXX_STANDARD 14)
+
 option(CXX "enable C++ compilation" ON)
 if(CXX)
     enable_language(CXX)

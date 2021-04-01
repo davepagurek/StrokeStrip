@@ -68,7 +68,7 @@ VectorXd LSSolver::solve(const VectorXd &guess, bool *is_valid)
         evalData->solveForDelta(_damping, delta, activeSet);
 
 		double delta_norm = delta.squaredNorm();
-		if (_isnan(delta_norm)) {
+		if (isnan(delta_norm)) {
 			if (is_valid != nullptr)
 				*is_valid = false;
 			break;

@@ -74,14 +74,14 @@ void Parameterization::parameterize_cluster(Cluster* cluster) {
 	cluster->xsecs = orthogonal_xsecs(*cluster);
 	std::vector<std::vector<double>> prev_u;
 
-	auto& record_current_u = [&]() -> void {
+	auto record_current_u = [&]() -> void {
 		prev_u.clear();
 		for (auto& stroke : cluster->strokes) {
 			prev_u.push_back(stroke.u);
 		}
 	};
 
-	auto& converged = [&]() -> bool {
+	auto converged = [&]() -> bool {
 		bool ok = true;
 		for (size_t stroke = 0; ok && stroke < prev_u.size(); ++stroke) {
 			for (size_t i = 0; ok && i < prev_u[stroke].size(); ++i) {
@@ -110,7 +110,7 @@ void Parameterization::parameterize_cluster(Cluster* cluster) {
 			double total_len = cluster->max_u();
 			for (auto& xsec : cluster->xsecs) {
 				if (xsec.connector) continue;
-				auto& get_u = [&](size_t idx) -> double {
+				auto get_u = [&](size_t idx) -> double {
 					auto& pt = xsec.points[idx];
 					double mix = pt.i - std::floor(pt.i);
 					return (1. - mix) * cluster->strokes[pt.stroke_idx].u[std::floor(pt.i)] +
@@ -1004,7 +1004,7 @@ void Parameterization::check_periodic(Cluster* cluster) {
 		return false;
 	};
 
-	auto& find_path = [&](const Node& from, const Cluster::XSec& to) -> std::vector<int> {
+	auto find_path = [&](const Node& from, const Cluster::XSec& to) -> std::vector<int> {
 		int allowed_jumps = 2;
 		std::unordered_map<int, std::vector<std::vector<bool>>> visited;
 		for (int jumped = 0; jumped <= allowed_jumps; ++jumped) {
