@@ -76,8 +76,9 @@ Input from_capture(Capture capture) {
 int main(int argc, char** argv) {
 	if (argc < 2) {
 		std::cout << "Usage: " << argv[0] << " input.scap [args]" << std::endl;
-		std::cout << "\t-d, --debug: Write debug visuals" << std::endl;
-		std::cout << "\t-c, --cut:   Cut sharp turns before processing" << std::endl;
+		std::cout << "\t-d, --debug:   Write debug visuals" << std::endl;
+		std::cout << "\t-c, --cut:     Cut sharp turns before processing" << std::endl;
+		std::cout << "\t-r, --rainbow: Visualize parameters as a rainbow instead of red-blue" << std::endl;
 		return -1;
 	}
 	std::string scap_filename(argv[1]);
@@ -96,6 +97,8 @@ int main(int argc, char** argv) {
 		}
 		else if (arg == "-c" || arg == "--cut") {
 			context.cut = true;
+		} else if (arg == "-r" || arg == "--rainbow") {
+			context.rainbow = true;
 		}
 	}
 
@@ -182,9 +185,9 @@ int main(int argc, char** argv) {
 	{
 		std::string final_output_name = scap_filename;
 		final_output_name.erase(final_output_name.length() - 5, 5); // remove .scap
-		final_output_name += "_rainbow.svg";
+		final_output_name += "_params.svg";
 		std::ofstream param_svg(final_output_name);
-		input.param_svg(param_svg, true);
+		input.param_svg(param_svg, context.rainbow);
 	}
 
 	{
