@@ -11,6 +11,9 @@ StrokeStrip jointly parameterizes clusters of strokes (a) that, together, repres
 Additional optional arguments:
  - `--cut`: If your input strokes include sharp back-and-forth turns, this flag will use the Cornucopia library to detect and cut such strokes.
  - `--debug`: Generate extra SVG outputs to introspect the algorithm
+ - `--rainbow`: Generate an SVG showing parameterized strokes coloured with a rainbow gradient (default is red-to-blue)
+ - `--widths`: Generate fitted widths along with centerlines
+ - `--taper`: Force fitted widths to taper to 0 at endpoints
 
 ## Input format
 Drawings are inputted as `.scap` files, which encode strokes as polylines. Strokes are contained in pairs of braces `{ ... }`. Each stroke has a unique stroke id and a cluster id shared by all strokes that colleectively make up one intended curve. Polyline samples can omit pressure by setting it to a default value of 0.
