@@ -63,7 +63,7 @@ FittedCurve Fitting::fit_cluster(Cluster cluster) {
 	// 4. Solve for positions
 	curve.centerline = fit_positions(samples, tangents, cluster.periodic);
 
-	if (context.taper_widths) {
+	if (context.widths) {
 		curve.widths = fit_widths(samples, cluster.periodic);
 	}
 	return curve;
@@ -151,7 +151,7 @@ std::vector<double> Fitting::fit_widths(const std::vector<Sample>& samples, bool
 			}
 			if (i > 0 && i+1 < N) {
 				// Middle
-				L[i][i] = 1.0/laplacian_dists[i] + 1.0/laplacian_dists[i + 1];
+				L[i][i] = 1.0/laplacian_dists[i-1] + 1.0/laplacian_dists[i];
 			} else if (i == 0) {
 				// First
 				L[i][i] = 1.0/laplacian_dists[i];
@@ -192,13 +192,13 @@ std::vector<double> Fitting::fit_widths(const std::vector<Sample>& samples, bool
 			(i < taper_len || i > N - taper_len)
 		);
 		if (has_minimum) {
-			model.addConstr(vars[i] >= 0.45 * samples[i].width);
+			model.addConstr(vars[i] >= std::max(1.0, 0.45 * samples[i].width));
 		} else {
-			model.addConstr(vars[i] >= 0);
+			model.addConstr(vars[i] >= 1.0);
 		}
 	}
 	for (size_t i : { size_t(0), size_t(N-1) }) {
-		model.addConstr(vars[i] <= 1.5 * samples[i].width);
+		model.addConstr(vars[i] <= std::max(1.0, 1.5 * samples[i].width));
 	}
 
 	context.optimize_model(&model);
