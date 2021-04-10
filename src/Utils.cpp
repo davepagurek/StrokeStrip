@@ -1,8 +1,9 @@
-#include "Utils.h"
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <vector>
 #include <future>
+
+#include "Utils.h"
 
 
 std::vector<Intersection> intersections(const std::vector<glm::dvec2>& polyline, glm::dvec2 from, glm::dvec2 to) {

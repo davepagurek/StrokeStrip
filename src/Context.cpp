@@ -1,3 +1,6 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include "Context.h"
 
 Context::Context(bool grb_log) : grb(true) {

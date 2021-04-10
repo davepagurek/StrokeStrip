@@ -1,7 +1,10 @@
 #pragma once
+
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include <ostream>
 #include <string>
-#include <cmath>
 
 namespace SVG {
 	inline void begin(std::ostream& os, double x, double y, double w, double h) {

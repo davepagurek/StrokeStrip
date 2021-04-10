@@ -1,3 +1,6 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include <future>
 
 #include "Fitting.h"
@@ -205,12 +208,12 @@ std::vector<double> Fitting::fit_widths(const std::vector<Sample>& samples, bool
 	for (auto& var : vars) {
 		opt_widths.push_back(var.get(GRB_DoubleAttr_X));
 	}
-	std::cout << "Checking if periodic" << std::endl;
-	std::cout << periodic << std::endl;
+
 	if (periodic) {
 		opt_widths.push_back(opt_widths.front());
 	}
-	std::cout << "Done" << std::endl;
+
+	return opt_widths;
 }
 
 std::vector<glm::dvec2> Fitting::fit_positions(const std::vector<Sample>& samples, const std::vector<glm::dvec2>& tangents, bool periodic) {

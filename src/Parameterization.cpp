@@ -1,5 +1,3 @@
-#include "Parameterization.h"
-
 #define _USE_MATH_DEFINES
 #include <cmath>
 
@@ -12,6 +10,7 @@
 #include <unordered_map>
 #include <glm/gtx/norm.hpp>
 
+#include "Parameterization.h"
 #include "Utils.h"
 #include "SvgUtils.h"
 
