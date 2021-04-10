@@ -11,5 +11,5 @@ struct Context {
 	bool cut = false;
 	bool rainbow = false;
 	bool widths = false;
-	bool taper_widths = true;
+	bool taper_widths = false;
 };
