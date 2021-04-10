@@ -79,6 +79,8 @@ int main(int argc, char** argv) {
 		std::cout << "\t-d, --debug:   Write debug visuals" << std::endl;
 		std::cout << "\t-c, --cut:     Cut sharp turns before processing" << std::endl;
 		std::cout << "\t-r, --rainbow: Visualize parameters as a rainbow instead of red-blue" << std::endl;
+		std::cout << "\t-w, --widths: Fit widths to clusters" << std::endl;
+		std::cout << "\t-t, --taper: Force fitted widths to taper at ends" << std::endl;
 		return -1;
 	}
 	std::string scap_filename(argv[1]);
@@ -99,6 +101,10 @@ int main(int argc, char** argv) {
 			context.cut = true;
 		} else if (arg == "-r" || arg == "--rainbow") {
 			context.rainbow = true;
+		} else if (arg == "-w" || arg == "--widths") {
+			context.widths = true;
+		} else if (arg == "-t" || arg == "--taper") {
+			context.taper_widths = true;
 		}
 	}
 

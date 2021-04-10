@@ -10,4 +10,6 @@ struct Context {
 	bool debug_viz = false;
 	bool cut = false;
 	bool rainbow = false;
+	bool widths = false;
+	bool taper_widths = true;
 };

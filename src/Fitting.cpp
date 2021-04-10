@@ -7,7 +7,7 @@
 
 Fitting::Fitting(const Context& context) : context(context) {}
 
-void Fitting::fit_svg(std::ostream& os, const Input& input, const std::map<int, std::vector<glm::dvec2>>& fits) {
+void Fitting::fit_svg(std::ostream& os, const Input& input, const std::map<int, FittedCurve>& fits) {
 	double padding = input.thickness;
 	double w = input.width * input.thickness + 2 * padding;
 	double h = input.height * input.thickness + 2 * padding;
@@ -16,20 +16,30 @@ void Fitting::fit_svg(std::ostream& os, const Input& input, const std::map<int, 
 
 	SVG::begin(os, x, y, w, h);
 	for (auto& kv : fits) {
-		std::vector<glm::dvec2> path = kv.second;
+		std::vector<glm::dvec2> path = kv.second.centerline;
+		std::vector<double> w = kv.second.widths;
 		for (auto& pt : path) {
 			pt *= input.thickness;
 		}
-		SVG::polyline(os, path, input.thickness);
+		for (auto& val : w) {
+			val *= input.thickness;
+		}
+		if (context.widths) {
+			SVG::variable_polyline(os, path, w);
+		} else {
+			SVG::polyline(os, path, input.thickness);
+		}
 	}
 	SVG::end(os);
 }
 
-std::map<int, std::vector<glm::dvec2>> Fitting::fit(Input* input) {
-	return map_clusters<std::vector<glm::dvec2>>(*input, [&](Cluster& c) { return fit_cluster(c); });
+std::map<int, FittedCurve> Fitting::fit(Input* input) {
+	return map_clusters<FittedCurve>(*input, [&](Cluster& c) { return fit_cluster(c); });
 }
 
-std::vector<glm::dvec2> Fitting::fit_cluster(Cluster cluster) {
+FittedCurve Fitting::fit_cluster(Cluster cluster) {
+	FittedCurve curve;
+
 	// 1. Get xsec samples more densely sampled near endpoints
 	{
 		Parameterization parameterization(context);
@@ -48,7 +58,159 @@ std::vector<glm::dvec2> Fitting::fit_cluster(Cluster cluster) {
 	auto tangents = fit_tangents(samples, cluster.periodic);
 
 	// 4. Solve for positions
-	return fit_positions(samples, tangents, cluster.periodic);
+	curve.centerline = fit_positions(samples, tangents, cluster.periodic);
+
+	if (context.taper_widths) {
+		curve.widths = fit_widths(samples, cluster.periodic);
+	}
+	return curve;
+}
+
+std::vector<double> Fitting::fit_widths(const std::vector<Sample>& samples, bool periodic) {
+	GRBModel model(context.grb);
+	const unsigned int N = samples.size();
+
+	// Create width variables
+	std::vector<GRBVar> vars;
+	vars.reserve(N);
+	for (size_t i = 0; i < N; ++i) {
+		GRBVar w = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+		vars.push_back(w);
+	}
+
+	std::vector<double> dists;
+	for (size_t i = 1; i < N; ++i) {
+		dists.push_back(glm::distance(samples[i].point, samples[i-1].point));
+	}
+
+	// Distances used in Laplacian matrix
+	std::vector<double> laplacian_dists;
+	{
+		double total = 0.0;
+		laplacian_dists.push_back(dists.front());
+		total += dists.front();
+
+		for (auto d : dists) {
+			laplacian_dists.push_back(d);
+			total += d;
+		}
+
+		laplacian_dists.push_back(dists.back());
+		total += dists.back();
+
+		for (auto& d : laplacian_dists) {
+			d /= total;
+		}
+	}
+
+	// Weight each distance matching term by the distance to the next point
+	std::vector<double> dist_weights;
+	{
+		double total = 0.0;
+		for (auto d : dists) {
+			dist_weights.push_back(d);
+			total += d;
+		}
+
+		dist_weights.push_back(dists.back());
+		total += dists.back();
+
+		for (auto& d : dist_weights) {
+			d /= total;
+		}
+	}
+
+	// Laplacian matrix
+	std::vector<std::vector<double>> L;
+	for (size_t i = 0; i < N; ++i) {
+		std::vector<double> col(N, 0.0);
+		L.push_back(col);
+	}
+	for (size_t i = 0; i < N; ++i) {
+		for (size_t j = 0; j < N; ++j) {
+			L[i][j] = 0.0;
+		}
+	}
+	for (size_t i = 0; i < N; ++i) {
+		if (context.taper_widths) {
+			// Zero Dirichlet conditions
+			L[i][i] = 1.0/laplacian_dists[i] + 1.0/laplacian_dists[i + 1];
+			if (i > 0) {
+				L[i][i-1] = -1.0/laplacian_dists[i];
+			}
+			if (i+1 < N) {
+				L[i][i+1] = -1.0/laplacian_dists[i+1];
+			}
+		} else {
+			// Zero Neumann conditions
+			if (i > 0) {
+				L[i][i-1] = -1.0/laplacian_dists[i-1];
+			}
+			if (i > 0 && i+1 < N) {
+				// Middle
+				L[i][i] = 1.0/laplacian_dists[i] + 1.0/laplacian_dists[i + 1];
+			} else if (i == 0) {
+				// First
+				L[i][i] = 1.0/laplacian_dists[i];
+			} else {
+				// Last
+				L[i][i] = 1.0/laplacian_dists[i-1];
+			}
+			if (i+1 < N) {
+				L[i][i+1] = -1.0/laplacian_dists[i];
+			}
+		}
+	}
+
+	// Laplacian objective: w^T * L * w;
+	GRBQuadExpr wT_L_w;
+	for (size_t i = 0; i < N; ++i) {
+		GRBLinExpr L_w;
+		for (size_t j = 0; j < N; ++j) {
+			L_w += L[i][j] * vars[j];
+		}
+		wT_L_w += vars[i] * L_w;
+	}
+
+	// Width matching objectives
+	std::vector<GRBLinExpr> width_matches;
+	width_matches.reserve(N);
+	for (size_t i = 0; i < N; ++i) {
+		width_matches.push_back(dist_weights[i] * (vars[i] - samples[i].width));
+	}
+
+	model.setObjective(wT_L_w + 200.0 * l2_norm_sq(&model, width_matches));
+
+	// Add constraints
+	int taper_len = std::min<int>(N/6, 500);
+	for (size_t i = 0; i < N; ++i) {
+		bool has_minimum = !(
+			context.taper_widths && !periodic &&
+			(i < taper_len || i > N - taper_len)
+		);
+		if (has_minimum) {
+			model.addConstr(vars[i] >= 0.45 * samples[i].width);
+		} else {
+			model.addConstr(vars[i] >= 0);
+		}
+	}
+	for (size_t i : { size_t(0), size_t(N-1) }) {
+		model.addConstr(vars[i] <= 1.5 * samples[i].width);
+	}
+
+	context.optimize_model(&model);
+
+	std::vector<double> opt_widths;
+	opt_widths.reserve(vars.size());
+	for (auto& var : vars) {
+		opt_widths.push_back(var.get(GRB_DoubleAttr_X));
+	}
+	std::cout << "Checking if periodic" << std::endl;
+	std::cout << periodic << std::endl;
+	if (periodic) {
+		opt_widths.push_back(opt_widths.front());
+	}
+	std::cout << "Done" << std::endl;
 }
 
 std::vector<glm::dvec2> Fitting::fit_positions(const std::vector<Sample>& samples, const std::vector<glm::dvec2>& tangents, bool periodic) {
@@ -186,12 +348,13 @@ std::vector<Fitting::Sample> Fitting::samples_from_xsec(const Cluster& cluster, 
 				tan,
 				k,
 				false,
-				true
+				true,
+				0.0
 			});
 		}
 	}
 	else {
-		result.push_back({ xsec.avg_point(), xsec.avg_tangent(), 0., false, false });
+		result.push_back({ xsec.avg_point(), xsec.avg_tangent(), 0., false, false, 0.0 });
 		auto& sample = result.back();
 
 		double change_mags = 0.;
@@ -232,6 +395,13 @@ std::vector<Fitting::Sample> Fitting::samples_from_xsec(const Cluster& cluster, 
 			dist = glm::dot(normal(sample.tangent), sample.point - cluster.xsecs[xsec_idx - 1].avg_point());
 		}
 		sample.k = std::max(MIN_DIST, dist) * change_mags;
+
+		if (xsec.points.size() > 0) {
+			sample.width = std::abs(glm::dot(
+				normal(sample.tangent),
+				xsec.points.front().point - xsec.points.back().point
+			));
+		}
 	}
 
 	return result;
