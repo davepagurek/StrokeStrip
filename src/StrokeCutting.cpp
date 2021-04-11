@@ -394,7 +394,7 @@ void RDP(std::vector<glm::dvec2> const &points, std::vector<size_t> &indices, do
 		glm::dvec2 simp_vector = points[indices.back()] - points[indices.front()];
 		glm::dvec2 normed = (glm::length(simp_vector) > std::numeric_limits<double>::epsilon()) ? glm::normalize(simp_vector) : glm::dvec2(1, 0);
 
-		glm::dvec2 tan;
+		glm::dvec2 tan(0.0, 0.0);
 		glm::dvec2 pre_tan(0, 0);
 
 		for (size_t i = 0; i < indices.size(); i++) {
@@ -476,7 +476,7 @@ void RDP(Sketch &s, double epsilon) {
 	}
 }
 
-// https://en.wikipedia.org/wiki/Ramer–Douglas–Peucker_algorithm
+// https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm
 Capture StrokeCut::cut_RDP(Capture const &capture) const {
 	double RDP_epsilon = 100;//35.;
 

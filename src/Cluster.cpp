@@ -45,7 +45,7 @@ std::vector<std::string> colors = {
 };
 
 glm::dvec2 simple_discrete_tangent(const std::vector<glm::dvec2>& points, size_t i) {
-	glm::dvec2 result;
+	glm::dvec2 result(0.0, 0.0);
 	if (i > 0) {
 		result += glm::normalize(points[i] - points[i - 1]);
 	} else {
@@ -55,7 +55,7 @@ glm::dvec2 simple_discrete_tangent(const std::vector<glm::dvec2>& points, size_t
 }
 
 glm::dvec2 discrete_tangent(const std::vector<glm::dvec2>& points, size_t i) {
-	glm::dvec2 result;
+	glm::dvec2 result(0.0, 0.0);
 	if (i > 0) {
 		result += glm::normalize(points[i] - points[i - 1]);
 	}
@@ -66,7 +66,7 @@ glm::dvec2 discrete_tangent(const std::vector<glm::dvec2>& points, size_t i) {
 }
 
 glm::dvec2 tangent(const std::vector<glm::dvec2>& points, double i) {
-	glm::dvec2 tangent;
+	glm::dvec2 tangent(0.0, 0.0);
 	size_t a = std::floor(i);
 	if (double(a) == i) {
 		tangent = discrete_tangent(points, (size_t)i);
@@ -223,7 +223,7 @@ double Cluster::XSec::distance_weight(size_t i) const {
 }
 
 glm::dvec2 Cluster::XSec::avg_point() const {
-	glm::dvec2 sum;
+	glm::dvec2 sum(0.0, 0.0);
 	for (auto& p : points) {
 		sum += p.point;
 	}
@@ -234,7 +234,7 @@ glm::dvec2 Cluster::XSec::avg_point() const {
 glm::dvec2 Cluster::XSec::avg_tangent() const {
 	if (points.size() == 1) return points.front().tangent;
 
-	glm::dvec2 sum;
+	glm::dvec2 sum(0.0, 0.0);
 
 	std::vector<double> dists(points.size(), 0.0);
 	for (size_t i = 0; i < points.size() - 1; ++i) {

@@ -510,7 +510,7 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 	glm::dvec2 origin = point(stroke_points, i);
 	glm::dvec2 tan = tangent(stroke_points, i);
 	glm::dvec2 ortho = normal(tan);
-	glm::dvec2 to_next;
+	glm::dvec2 to_next(0.0, 0.0);
 	if (a < stroke_points.size() - 1) {
 		to_next = (1 - mix) * (stroke_points[a + 1] - stroke_points[a]);
 	}
@@ -545,7 +545,7 @@ Cluster::XSec Parameterization::orthogonal_xsec_at(const Cluster& cluster, size_
 			// Ignore origin point
 			if (stroke == j && std::abs(intersection.i - i) < 1e-1) continue;
 
-			glm::dvec2 to_next;
+			glm::dvec2 to_next(0.0, 0.0);
 			double other_i = intersection.i;
 			size_t floor_other_i = std::floor(intersection.i);
 			if (floor_other_i < cluster.strokes[j].points.size() - 1) {
@@ -644,7 +644,7 @@ std::vector<Cluster::XSec> Parameterization::xsecs_from_params(const Cluster& cl
 			if (!sampled[stroke_idx][i]) {
 				auto xsec = xsec_at_u(cluster, cluster.strokes[stroke_idx].u[i]);
 				if (xsec.points.empty()) {
-					glm::dvec2 to_next;
+					glm::dvec2 to_next(0.0, 0.0);
 					if (i < cluster.strokes[stroke_idx].points.size() - 1) {
 						to_next = cluster.strokes[stroke_idx].points[i + 1] - cluster.strokes[stroke_idx].points[i];
 					}
@@ -745,7 +745,7 @@ Cluster::XSec Parameterization::xsec_at_u(const Cluster& cluster, double u) {
 			double i = a + mix;
 			glm::dvec2 point = (1. - mix) * stroke.points[a] + mix * stroke.points[b];
 
-			glm::dvec2 to_next;
+			glm::dvec2 to_next(0.0, 0.0);
 			if (it_gt != it_le) {
 				to_next = stroke.points[b] - point;
 			}
@@ -901,11 +901,11 @@ void Parameterization::ensure_connected(Cluster* cluster, Cluster::XSec* cut) {
 
 						double dist = glm::distance2(cluster->strokes[stroke_a].points[ia], cluster->strokes[stroke_b].points[ib]);
 						if (dist < closest_dist) {
-							glm::dvec2 to_next_a;
+							glm::dvec2 to_next_a(0.0, 0.0);
 							if (ia == 0) to_next_a = cluster->strokes[stroke_a].points[ia + 1] - cluster->strokes[stroke_a].points[ia];
 							else to_next_a = cluster->strokes[stroke_a].points[ia] - cluster->strokes[stroke_a].points[ia - 1];
 
-							glm::dvec2 to_next_b;
+							glm::dvec2 to_next_b(0.0, 0.0);
 							if (ib == 0) to_next_b = cluster->strokes[stroke_b].points[ib + 1] - cluster->strokes[stroke_b].points[ib];
 							else to_next_b = cluster->strokes[stroke_b].points[ib] - cluster->strokes[stroke_b].points[ib - 1];
 
