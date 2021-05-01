@@ -1,4 +1,23 @@
-# StrokeStrip
+# StrokeStrip: Joint Parameterization and Fitting of Stroke Clusters
+
+#### Dave Pagurek van Mossel<sup>1</sup>, Chenxi Liu<sup>1</sup>, Nicholas Vining<sup>1,2</sup>, Mikhail Bessmeltsev<sup>3</sup>, Alla Sheffer<sup>1</sup>
+
+<small><sup>1</sup>University of British Columbia, <sup>2</sup>NVIDIA, <sup>3</sup>Université de Montréal</small>
+
+```
+@article{strokestrip,
+	title = {StrokeStrip: Joint Parameterization and Fitting of Stroke Clusters},
+	author = {Pagurek van Mossel, Dave and Liu, Chenxi and Vining, Nicholas and Bessmeltsev, Mikhail and Sheffer, Alla},
+	year = 2021,
+	journal = {ACM Transactions on Graphics},
+	publisher = {ACM},
+	address = {New York, NY, USA},
+	volume = 40,
+	number = 4,
+	doi = {10.1145/3450626.3459777}
+}
+```
+
 <img src="https://github.com/davepagurek/StrokeStrip/blob/main/img/overview.png?raw=true" />
 
 StrokeStrip jointly parameterizes clusters of strokes (a) that, together, represent strips following a single intended curve (b). We compute the parameterization of this strip (c) restricted to the domain of the input strokes (d), which we then use to produce the parameterized intended curve (d).
