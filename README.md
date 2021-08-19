@@ -58,10 +58,16 @@ Stroke clusters for new `.scap` files can be generated using the [StrokeAggregat
 
 ### Dependencies
 #### Gurobi
-This package relies on the Gurobi optimization library, which must be installed and licensed on your machine. If you are at a university, a [free academic license can be obtained.](https://www.gurobi.com/downloads/end-user-license-agreement-academic/) This project was build with Gurobi 9.0; if you are using a newer version of Gurobi, update `FindGUROBI.cmake` to reference your installed version (e.g. change `gurobi90` to `gurobi91` for version 9.1.)
+This package relies on the Gurobi optimization library, which must be installed and licensed on your machine. If you are at a university, a [free academic license can be obtained.](https://www.gurobi.com/downloads/end-user-license-agreement-academic/) This project was built with Gurobi 9.1; if you are using a newer version of Gurobi, update `FindGUROBI.cmake` to reference your installed version (e.g. change `gurobi91` to `gurobi92` for version 9.2.)
 
 #### Eigen 3
-Ensure that Eigen is installed and that its directory is included in `$CMAKE_PREFIX_PATH`.
+On Mac, install Eigen with:
+
+```sh
+brew install eigen
+```
+
+For other platforms, ensure that Eigen is installed and that its installation directory is included in `$CMAKE_PREFIX_PATH`.
 
 ### Building
 StrokeStrip is configured with Cmake:
@@ -71,4 +77,18 @@ mkdir build
 cd build
 cmake ..
 make
+```
+
+### Recreating figures
+To recreate the data in Fig. 17 of the paper, run:
+
+```sh
+./examples/letters/generate_letters_data.sh
+```
+
+This takes the `.scap` files in the `examples/letters` directory (encoding the clustered inputs in the top half of the figure in the <a href="#input-format">format described in this README</a>) and creates files ending with `_fit.svg`. These SVGs will contain the fitted curves from the bottom half of the figure, where each stroke represents one cluster from the input.
+
+The inputs for our user study are present in the `examples/study_inputs` directory. To generate our method's fitted curve for any example in the directory, run the following command, substituting the filename you wish to generate:
+```sh
+build/strokestrip examples/study_inputs/archi10c_SA_cluster.scap
 ```

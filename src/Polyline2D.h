@@ -98,13 +98,16 @@ namespace SketchUI
 			return oss.str();
 		}
 
-		void from_string(std::string point_str) {
+		bool from_string(std::string point_str) {
 			point_str = point_str.substr(point_str.find_first_not_of("\t"));
 			std::vector<std::string> strs = SketchUI::split_str(point_str, "\t");
 
-			assert(strs.size() >= 2);
+			if (strs.size() < 2) {
+				return false;
+			}
 			x = std::stod(strs[0]);
 			y = std::stod(strs[1]);
+			return true;
 		}
 	};
 
@@ -582,7 +585,8 @@ namespace SketchUI
 				}
 
 				Point2D point;
-				point.from_string(strs[i]);
+				bool ok = point.from_string(strs[i]);
+				if (!ok) continue;
 
 				uint64_t time;
 				{
